@@ -51,6 +51,30 @@ This opens a shell with the full toolchain available:
 
 Exit the shell to return to your normal environment.
 
+** Quick-launch targets (recommended)
+
+If you prefer not to manually enter a shell first, the Makefile includes
+convenience targets that launch GUI tools *inside the Guix environment*:
+
+#+begin_src sh
+make freecad                 # opens freecad/*.FCStd if present
+make freecad-joystick-step   # opens cad/joystick/*.step if present
+make freecad-pcb-step        # opens cad/pcb/*.step if present
+
+make kicad                   # opens kicad/*.kicad_pro if present
+make pcbnew                  # opens kicad/*.kicad_pcb if present
+make eeschema                # opens kicad/*.kicad_sch if present
+
+make blender                 # opens blender/*.blend if present
+
+make poster-print            # opens poster/print.svg in Inkscape
+make poster-iposter          # opens poster/iposter.svg in Inkscape
+make gimp FILE=path.png      # opens GIMP (optionally a file)
+#+end_src
+
+These targets create per-project config directories in =.config/= so the project
+does not depend on your global KiCad/FreeCAD settings.
+
 ** Pure shell (more reproducible)
 
 #+begin_src sh
