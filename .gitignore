@@ -1,0 +1,67 @@
+# --- Build / export outputs ---
+/output/
+/*.pdf
+/*.png
+/*.jpg
+/*.jpeg
+/*.tif
+/*.tiff
+/*.bmp
+/*.webp
+/*.gif
+/*.exr
+
+# --- Blender ---
+*.blend1
+*.blend2
+*.blend3
+*.blend4
+*.blend@*
+/blender/cache/
+/blender/textures/
+/blender/renders/
+
+# --- FreeCAD ---
+*.FCStd1
+*.FCStd~
+*.FCBak
+
+# --- KiCad ---
+**/fp-info-cache
+**/*-backups/
+**/*.kicad_prl
+**/*.kicad_pro~
+**/*.kicad_sch-bak
+**/*.kicad_pcb-bak
+**/*.net
+**/*.bak
+**/*.bck
+**/*.000
+**/*.001
+**/*.dcm
+**/*.tmp
+**/*.kicad_pro.user
+**/*.kicad_prl
+**/*.lck
+
+# KiCad plot outputs (if you generate them)
+/kicad/**/gerbers/
+/kicad/**/plots/
+
+# --- Inkscape ---
+*.autosave.svg
+*.svg~
+
+# --- GIMP ---
+*.xcf~
+
+# --- OS/editor ---
+.DS_Store
+Thumbs.db
+*~
+.vscode/
+.idea/
+
+# --- Guix ---
+/.guix-profile
+/guix/.*.tmp

@@ -1,0 +1,162 @@
+#+title: mouse-joystick-poster
+#+options: toc:2 num:nil
+
+* Overview
+
+This repository is the working directory for a scientific/engineering poster about a
+mouse pull joystick rig and its *Mechatronic Boundary Model (MBM)* framing.
+
+The goal is to keep the *toolchain reproducible* (CAD → render → layout) using
+GNU Guix, while keeping the poster *portable* between:
+
+- a traditional printed poster (up to 45×45 in), and
+- an iPoster-style digital poster (55" touch screen), without depending on proprietary tools.
+
+* Repository layout
+
+This is a suggested structure. Use what fits your workflow.
+
+- =cad/= :: STEP files and derived CAD assets
+  - =cad/joystick/= :: joystick assembly STEP, subparts, notes
+  - =cad/pcb/= :: pcb assembly STEP, subparts, notes
+- =kicad/= :: KiCad project(s)
+- =freecad/= :: FreeCAD project(s) used to explode/arrange STEP assemblies
+- =blender/= :: Blender scene(s) used to render poster-quality images
+- =poster/= :: Inkscape (SVG) source poster layouts
+- =output/renders/= :: rendered images (PNG, EXR, etc.)
+- =output/exports/= :: exported PDFs / final deliverables (print + iPoster)
+- =docs/= :: extra notes, references, meeting notes, etc.
+
+* Reproducible environment (Guix)
+
+** Prerequisite
+
+Install GNU Guix on your machine (system install or in userland).
+
+** Enter the development environment
+
+From the repo root:
+
+#+begin_src sh
+make shell
+#+end_src
+
+This opens a shell with the full toolchain available:
+
+- =kicad=
+- =freecad=
+- =blender=
+- =inkscape=
+- =gimp=
+
+Exit the shell to return to your normal environment.
+
+** Pure shell (more reproducible)
+
+#+begin_src sh
+make shell-pure
+#+end_src
+
+If GUI apps have issues in the pure shell (fonts, locales, etc.), see *Troubleshooting*.
+
+** Pinning =channels.scm= (important)
+
+To make the environment *fully reproducible* for collaborators and for your future self,
+pin Guix to an exact revision:
+
+#+begin_src sh
+make lock-channels
+git add guix/channels.scm
+git commit -m "Pin Guix channel revision"
+#+end_src
+
+Once pinned, *everyone* can reproduce the same environment using:
+
+#+begin_src sh
+make shell
+#+end_src
+
+because =guix time-machine= will use the exact commit recorded in =guix/channels.scm=.
+
+* Workflow sketch (CAD → render → layout)
+
+This is a practical pipeline that keeps assets editable and poster-friendly.
+
+** 1) CAD / EDA: produce STEP assemblies
+
+- Joystick assembly: place in =cad/joystick/=
+- PCB assembly:
+  - create in KiCad
+  - export 3D / STEP (as needed)
+  - place in =cad/pcb/=
+
+** 2) FreeCAD: explode & stage views
+
+Use FreeCAD to:
+
+- import STEP assemblies
+- create an *exploded* configuration
+- set up repeatable camera/view directions (orthographic is often best for posters)
+- export meshes if you plan to render in Blender
+
+Output examples:
+- a “technical” orthographic view (good for labels/callouts)
+- a slightly more dynamic view to use as a hero image
+
+Save FreeCAD project files in =freecad/=.
+
+** 3) Blender: poster-quality renders
+
+Use Blender to render:
+
+- high-resolution PNG (often with transparent background) for overlaying labels
+- optionally a “hero” render with nicer lighting/shadows for visual impact
+
+Save Blender files in =blender/= and rendered images in =output/renders/=.
+
+** 4) Layout: Inkscape (SVG source of truth)
+
+Keep the poster layout in SVG so you can export to:
+
+- print PDF (square format; up to 45×45 in)
+- iPoster PDF (often 16:9 landscape)
+
+Suggested approach:
+- =poster/print.svg=
+- =poster/iposter.svg=
+
+Exports go in =output/exports/=.
+
+* iPoster vs print notes
+
+You can avoid lock-in by maintaining the *same content assets* (renders, diagrams, plots)
+and exporting two layouts.
+
+For iPoster, you can add optional interaction (embedded links, QR codes, page navigation),
+but try to keep the core narrative readable in a static export.
+
+* Troubleshooting
+
+** Fonts missing in pure shell
+
+If text renders oddly in Inkscape/GIMP/Blender, confirm fonts are present in the shell:
+
+#+begin_src sh
+fc-list | head
+#+end_src
+
+This manifest includes a baseline set of fonts and =fontconfig=.
+
+** Locales
+
+If you see locale warnings, you may need:
+
+#+begin_src sh
+export GUIX_LOCPATH="$HOME/.guix-profile/lib/locale"
+#+end_src
+
+(Or consider using =make shell= instead of =make shell-pure=.)
+
+* License
+
+Add a license if/when you intend to publish/distribute the design files.
