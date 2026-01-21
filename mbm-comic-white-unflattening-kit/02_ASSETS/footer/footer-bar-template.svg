@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="4608" height="288" viewBox="0 0 4608 288">
+  <rect width="4608" height="288" fill="#f3f4f6" stroke="#111827" stroke-width="2"/>
+  <text x="60" y="90" font-family="Arial" font-size="52" fill="#111827">Authors · Affiliations · Contact</text>
+  <text x="60" y="160" font-family="Arial" font-size="36" fill="#111827">Legend: cyan = information, amber = power, red = dissipation</text>
+  <text x="60" y="220" font-family="Arial" font-size="28" fill="#6b7280">QRs: paper · code · data</text>
+</svg>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="260" viewBox="0 0 900 260">
+  <rect width="900" height="260" fill="#ffffff"/>
+  <text x="20" y="34" font-family="Arial" font-size="22" fill="#111827">Arrow grammar</text>
+  <g transform="translate(20,60)" font-family="Arial" font-size="16" fill="#111827">
+    <path d="M40,40 L360,40" stroke="#06b6d4" stroke-width="6" fill="none"/>
+    <polygon points="360,40 340,30 340,50" fill="#06b6d4"/>
+    <text x="0" y="85">Information (thin)</text>
+
+    <path d="M480,40 L820,40" stroke="#f59e0b" stroke-width="16" fill="none" stroke-linecap="round"/>
+    <polygon points="820,40 790,20 790,60" fill="#f59e0b"/>
+    <text x="460" y="85">Power (thick)</text>
+
+    <path d="M40,150 C180,120 260,180 380,150" stroke="#dc2626" stroke-width="10" fill="none" stroke-dasharray="12,10" stroke-linecap="round"/>
+    <polygon points="380,150 350,130 350,170" fill="#dc2626"/>
+    <text x="0" y="195">Optional dissipation / waste (dashed, smoky)</text>
+  </g>
+</svg>
