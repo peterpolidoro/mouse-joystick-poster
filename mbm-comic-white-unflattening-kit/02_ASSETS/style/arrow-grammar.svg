@@ -1,43 +1,47 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="900" height="300" viewBox="0 0 900 300">
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="320" viewBox="0 0 900 320">
   <defs>
-    <linearGradient id="steel" x1="0" x2="1" y1="0" y2="0">
+    <linearGradient id="sheath" x1="0" x2="1" y1="0" y2="0">
       <stop offset="0" stop-color="#e5e7eb"/>
       <stop offset="0.5" stop-color="#9ca3af"/>
       <stop offset="1" stop-color="#e5e7eb"/>
     </linearGradient>
-    <linearGradient id="copper" x1="0" x2="1" y1="0" y2="0">
-      <stop offset="0" stop-color="#fcd34d"/>
-      <stop offset="0.5" stop-color="#b45309"/>
-      <stop offset="1" stop-color="#fcd34d"/>
+    <linearGradient id="powerSheath" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#d1d5db"/>
+      <stop offset="0.5" stop-color="#6b7280"/>
+      <stop offset="1" stop-color="#d1d5db"/>
     </linearGradient>
   </defs>
 
-  <rect width="900" height="300" fill="#ffffff"/>
-  <text x="20" y="34" font-family="Arial" font-size="22" fill="#111827">Arrow grammar (metallic body + colored accent)</text>
+  <rect width="900" height="320" fill="#ffffff"/>
+  <text x="20" y="34" font-family="Arial" font-size="22" fill="#111827">Tether grammar (physical cables + pulse direction cues)</text>
+  <text x="20" y="58" font-family="Arial" font-size="14" fill="#374151">Avoid flat arrow icons. Use tangible cables/wires; show direction with moving pulses/beads and color accents.</text>
 
-  <g transform="translate(20,60)" font-family="Arial" font-size="16" fill="#111827">
+  <g transform="translate(20,90)" font-family="Arial" font-size="16" fill="#111827">
 
-    <!-- Information -->
-    <path d="M40,40 L360,40" stroke="url(#steel)" stroke-width="10" fill="none" stroke-linecap="round"/>
-    <path d="M40,40 L360,40" stroke="#06b6d4" stroke-width="4" fill="none" stroke-linecap="round"/>
-    <polygon points="360,40 340,30 340,50" fill="#9ca3af"/>
-    <polygon points="360,40 346,34 346,46" fill="#06b6d4"/>
-    <text x="0" y="85">Information (thin metallic + cyan accent)</text>
+    <!-- Information tether -->
+    <path d="M40,40 C140,10 260,70 360,40" stroke="url(#sheath)" stroke-width="10" fill="none" stroke-linecap="round"/>
+    <path d="M40,40 C140,10 260,70 360,40" stroke="#06b6d4" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <!-- pulse beads -->
+    <circle cx="110" cy="24" r="5" fill="#06b6d4" opacity="0.95"/>
+    <circle cx="190" cy="48" r="5" fill="#06b6d4" opacity="0.75"/>
+    <circle cx="270" cy="56" r="5" fill="#06b6d4" opacity="0.55"/>
+    <circle cx="330" cy="44" r="5" fill="#06b6d4" opacity="0.35"/>
+    <text x="0" y="90">Information (thin fiber/wire harness + cyan accent + pulse beads)</text>
 
-    <!-- Power -->
-    <path d="M480,40 L820,40" stroke="url(#copper)" stroke-width="18" fill="none" stroke-linecap="round"/>
-    <path d="M480,40 L820,40" stroke="#f59e0b" stroke-width="6" fill="none" stroke-linecap="round" opacity="0.9"/>
-    <polygon points="820,40 790,20 790,60" fill="#92400e"/>
-    <polygon points="820,40 802,28 802,52" fill="#f59e0b"/>
-    <text x="460" y="85">Power (thick metallic + amber accent)</text>
+    <!-- Power tether -->
+    <path d="M480,40 C600,5 700,85 820,40" stroke="url(#powerSheath)" stroke-width="18" fill="none" stroke-linecap="round"/>
+    <path d="M480,40 C600,5 700,85 820,40" stroke="#f59e0b" stroke-width="6" fill="none" stroke-linecap="round" opacity="0.9"/>
+    <!-- chain-ish sleeve hint (dashed overlay) -->
+    <path d="M480,40 C600,5 700,85 820,40" stroke="#111827" stroke-width="2" fill="none" stroke-dasharray="6,10" opacity="0.25"/>
+    <!-- warm pulses -->
+    <circle cx="560" cy="25" r="7" fill="#f59e0b" opacity="0.95"/>
+    <circle cx="650" cy="58" r="7" fill="#f59e0b" opacity="0.7"/>
+    <circle cx="740" cy="60" r="7" fill="#f59e0b" opacity="0.45"/>
+    <text x="460" y="90">Power (thick braided/chain‑sleeved cable + amber accent + warm pulses)</text>
 
     <!-- Optional dissipation -->
-    <path d="M40,165 C180,135 260,195 380,165" stroke="#dc2626" stroke-width="10" fill="none" stroke-dasharray="12,10" stroke-linecap="round" opacity="0.75"/>
-    <polygon points="380,165 350,145 350,185" fill="#dc2626" opacity="0.75"/>
-    <text x="0" y="210">Optional dissipation / waste (dashed, smoky)</text>
+    <path d="M40,165 C180,135 260,195 380,165" stroke="#dc2626" stroke-width="10" fill="none" stroke-dasharray="12,10" stroke-linecap="round" opacity="0.6"/>
+    <text x="0" y="210">Optional dissipation / waste (faint red haze / heat shimmer)</text>
 
-    <text x="0" y="250" font-size="14" fill="#374151">
-      Keep the body “real” (metal, shadow, depth). Meaning comes from cyan/amber accents.
-    </text>
   </g>
 </svg>

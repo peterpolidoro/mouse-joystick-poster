@@ -3,9 +3,9 @@
 ## 0) Narrative role (why this panel exists)
 The closing strip becomes more abstract: a visual epilogue that connects MBM to cybernetic thermodynamics.
 The viewer should leave with the intuition that power and information are not separate “layers” — they are coupled via entropy production,
-constraints, and control. Keep it poetic but still grounded in the same metallic grammar.
+constraints, and control. Keep it poetic but still grounded in the same icosahedron+tether grammar.
 
-**Incoming from previous panel:** Use a visual echo from the prior panel (artifacts, arrows, or boundary sphere) so the zoom feels continuous.
+**Incoming from previous panel:** Use a visual echo from the prior panel (artifacts, tethers, or boundary token) so the zoom feels continuous.
 
 **Outgoing to next panel:** No next panel — this is the final ‘breath out’. Make it feel like a concluding cadence.
 
@@ -18,7 +18,7 @@ After 3 seconds, the viewer should be able to say what crosses the boundary here
 
 ## 2) What this panel MUST show (non‑negotiable)
 - A wide, minimal composition (banner strip).
-- One boundary sphere motif (nickel rings) with both a power arrow (amber) and an info arrow (cyan) crossing it.
+- One boundary token motif (wireframe icosahedron) with both a power tether (amber) and an info tether (cyan) crossing it.
 - A faint dissipation/entropy motif (subtle red haze, heat shimmer, or scattered particles) leaving the boundary.
 - Optional: a very small symbolic equation or icon (entropy S, k_B, or ‘ΔS’) — only if it stays legible and not text-heavy.
 
@@ -27,8 +27,8 @@ After 3 seconds, the viewer should be able to say what crosses the boundary here
 ## 3) Composition & “Unflattening” cues (make it feel like a graphic novel)
 - Semi‑realistic 3D scene with depth, perspective, and soft studio lighting.
 - Use **one strong focal object** + a few supporting objects.
-- Let arrows curve in **3D space** (not straight flat connectors).
-- Boundaries are **brushed‑nickel armillary spheres** (intersecting rings). Keep the interior visible.
+- Let tethers curve in **3D space** (not straight flat connectors).
+- Boundaries are **3D icosahedron boundary tokens** (wireframe/strut platonic solids). Use vertex ports; keep the interior visible.
 - Keep backgrounds clean (white/very light gray). Avoid heavy textures.
 
 ---
@@ -62,12 +62,12 @@ After 3 seconds, the viewer should be able to say what crosses the boundary here
 
 ## 6) Prompt block (copy/paste into the panel chat)
 > Create ONE comic panel illustration (semi‑realistic 3D, print‑friendly on white) for a 48×48 inch poster.  
-> Use the MBM grammar: boundaries are **3D brushed‑nickel armillary spheres** with small port collars; **information** crossings are thin metallic arrows/tubes with a cyan accent (#06B6D4); **power** crossings are thicker metallic arrows/tubes with an amber accent (#F59E0B).  
+> Use the MBM grammar: boundaries are **3D icosahedron boundary tokens** (wireframe/strut platonic solids) with small connector nodes at vertices (ports). Replace arrow glyphs with **tangible 3D tethers**: **information** is a thin fiber/wire harness with cyan accent (#06B6D4) and tiny light pulses/beads indicating direction; **power** is a thicker braided cable or chain‑sleeved hose with amber accent (#F59E0B) and warm glow pulses indicating direction.  
 > Avoid flat block-diagram aesthetics. Use perspective depth, soft shadows, and a clean white/very light background. Keep embedded text minimal (0–2 tiny labels max).  
 > Use any uploaded reference images faithfully where applicable (paper title page, rig photo, PCB screenshot, etc.).  
 > Panel content requirements:  
 > > - A wide, minimal composition (banner strip).
-> - One boundary sphere motif (nickel rings) with both a power arrow (amber) and an info arrow (cyan) crossing it.
+> - One boundary token motif (wireframe icosahedron) with both a power tether (amber) and an info tether (cyan) crossing it.
 > - A faint dissipation/entropy motif (subtle red haze, heat shimmer, or scattered particles) leaving the boundary.
 > - Optional: a very small symbolic equation or icon (entropy S, k_B, or ‘ΔS’) — only if it stays legible and not text-heavy.  
 > Include a subtle transition cue toward the next panel: No next panel — this is the final ‘breath out’. Make it feel like a concluding cadence.
@@ -78,4 +78,4 @@ After 3 seconds, the viewer should be able to say what crosses the boundary here
 - No PowerPoint / UML / SysML block diagram look.
 - No dense paragraphs of text inside the image.
 - Don’t swap the color semantics (cyan=information, amber=power).
-- Don’t make the boundary a soap-bubble rainbow; it must read as **brushed nickel metal**.
+- Don’t render the boundary as a soap bubble or metallic sphere; it must read as a **wireframe/strut icosahedron boundary token** with vertex ports.

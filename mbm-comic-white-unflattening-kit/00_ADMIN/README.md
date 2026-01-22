@@ -1,7 +1,7 @@
-# MBM Comic Poster — Project Kit (White Paper + Metallic Boundaries)
+# MBM Comic Poster — Project Kit (White Paper + Icosahedron Boundaries)
 
 You will generate **10 panel images** in 10 separate chats, then place them into the Inkscape template.
-The panels are designed to read like a **graphic novel page** (non-uniform layout) rather than a traditional poster.
+The panels are designed to read like a **graphic novel page** (non‑uniform layout) rather than a traditional poster.
 
 ---
 
@@ -13,7 +13,7 @@ The panels are designed to read like a **graphic novel page** (non-uniform layou
 3. Insert each panel image:
    - `File → Import…` and pick `P01.png` (etc.)
    - Move the image above the correct panel group.
-   - Select the imported image, then *Shift-select* that panel’s `PXX_CLIP` shape (an invisible clipping shape).
+   - Select the imported image, then *Shift‑select* that panel’s `PXX_CLIP` shape (an invisible clipping shape).
    - `Object → Clip → Set`
    - The panel’s `PXX_FRAME` stroke stays visible as the border.
 4. Repeat for P01…P10.
@@ -40,11 +40,12 @@ Then prompt the model with something like:
 > “Generate the panel image following global-context.md and this panel’s context.md.”
 
 ### Core visual grammar (what every panel must obey)
-- Boundaries = **3D brushed‑nickel armillary spheres**
-- Information arrows = **thin metallic arrows with cyan accent**
-- Power arrows = **thick metallic arrows with amber accent**
+- Boundaries = **3D icosahedron boundary tokens** (wireframe/strut platonic solid)
+- Ports = **vertex connector nodes** (cyan rim = info, amber rim = power)
+- Information flow = **thin fiber/wire harness tether** with cyan accent + tiny pulse/bead direction cues
+- Power flow = **thick braided cable / chain‑sleeved hose tether** with amber accent + warm pulse direction cues
 - Background = **white/transparent**, print friendly
-- Avoid flat block diagrams
+- Avoid flat block diagrams and avoid arrow icons (use tangible tethers instead)
 
 ---
 
@@ -60,4 +61,4 @@ Use the naming `P01.png` … `P10.png` exactly — the SVG labels match.
 ## 4) Optional style references
 
 - `02_ASSETS/style/palette-white.svg`
-- `02_ASSETS/style/arrow-grammar.svg`
+- `02_ASSETS/style/arrow-grammar.svg` (still useful as a color/flow legend)
