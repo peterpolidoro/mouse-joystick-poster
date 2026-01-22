@@ -1,17 +1,43 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="900" height="260" viewBox="0 0 900 260">
-  <rect width="900" height="260" fill="#ffffff"/>
-  <text x="20" y="34" font-family="Arial" font-size="22" fill="#111827">Arrow grammar</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="300" viewBox="0 0 900 300">
+  <defs>
+    <linearGradient id="steel" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#e5e7eb"/>
+      <stop offset="0.5" stop-color="#9ca3af"/>
+      <stop offset="1" stop-color="#e5e7eb"/>
+    </linearGradient>
+    <linearGradient id="copper" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#fcd34d"/>
+      <stop offset="0.5" stop-color="#b45309"/>
+      <stop offset="1" stop-color="#fcd34d"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="900" height="300" fill="#ffffff"/>
+  <text x="20" y="34" font-family="Arial" font-size="22" fill="#111827">Arrow grammar (metallic body + colored accent)</text>
+
   <g transform="translate(20,60)" font-family="Arial" font-size="16" fill="#111827">
-    <path d="M40,40 L360,40" stroke="#06b6d4" stroke-width="6" fill="none"/>
-    <polygon points="360,40 340,30 340,50" fill="#06b6d4"/>
-    <text x="0" y="85">Information (thin)</text>
 
-    <path d="M480,40 L820,40" stroke="#f59e0b" stroke-width="16" fill="none" stroke-linecap="round"/>
-    <polygon points="820,40 790,20 790,60" fill="#f59e0b"/>
-    <text x="460" y="85">Power (thick)</text>
+    <!-- Information -->
+    <path d="M40,40 L360,40" stroke="url(#steel)" stroke-width="10" fill="none" stroke-linecap="round"/>
+    <path d="M40,40 L360,40" stroke="#06b6d4" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <polygon points="360,40 340,30 340,50" fill="#9ca3af"/>
+    <polygon points="360,40 346,34 346,46" fill="#06b6d4"/>
+    <text x="0" y="85">Information (thin metallic + cyan accent)</text>
 
-    <path d="M40,150 C180,120 260,180 380,150" stroke="#dc2626" stroke-width="10" fill="none" stroke-dasharray="12,10" stroke-linecap="round"/>
-    <polygon points="380,150 350,130 350,170" fill="#dc2626"/>
-    <text x="0" y="195">Optional dissipation / waste (dashed, smoky)</text>
+    <!-- Power -->
+    <path d="M480,40 L820,40" stroke="url(#copper)" stroke-width="18" fill="none" stroke-linecap="round"/>
+    <path d="M480,40 L820,40" stroke="#f59e0b" stroke-width="6" fill="none" stroke-linecap="round" opacity="0.9"/>
+    <polygon points="820,40 790,20 790,60" fill="#92400e"/>
+    <polygon points="820,40 802,28 802,52" fill="#f59e0b"/>
+    <text x="460" y="85">Power (thick metallic + amber accent)</text>
+
+    <!-- Optional dissipation -->
+    <path d="M40,165 C180,135 260,195 380,165" stroke="#dc2626" stroke-width="10" fill="none" stroke-dasharray="12,10" stroke-linecap="round" opacity="0.75"/>
+    <polygon points="380,165 350,145 350,185" fill="#dc2626" opacity="0.75"/>
+    <text x="0" y="210">Optional dissipation / waste (dashed, smoky)</text>
+
+    <text x="0" y="250" font-size="14" fill="#374151">
+      Keep the body “real” (metal, shadow, depth). Meaning comes from cyan/amber accents.
+    </text>
   </g>
 </svg>

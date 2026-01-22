@@ -1,45 +1,83 @@
-# P05 — Boundary around mouse + joystick rig
+# P05 — Boundary around mouse + joystick rig + sensors/actuators
 
-## 1) Goal (viewer takeaway)
-One strong visual sentence: **3D scene of mouse/rig; bubble boundary; show measured info out and commanded info in; power to actuators.**
+## 0) Narrative role (why this panel exists)
+This panel foregrounds the *biophysical interface*: the mouse interacting with the joystick while the rig senses and actuates.
+The viewer should feel that “the experiment” is a coupled cyber-physical system: mechanics + animal + sensors + actuators,
+and that meaningful information (events, kinematics, force) is created at this boundary.
 
-## 2) Must-use global grammar (do not change)
-- Boundary = translucent spherical bubble(s)
-- Information = cyan (#06B6D4) thin arrows/fibers
-- Power = amber (#F59E0B) thick ribbons/tubes
-- Optional dissipation = muted red (#DC2626) haze/flow
-- Artifacts = physical objects (glass cards / data crystals)
+**Incoming from previous panel:** Use a visual echo from the prior panel (artifacts, arrows, or boundary sphere) so the zoom feels continuous.
 
-## 3) Composition notes
-- White / paper-friendly background (match #FFFFFF or very light #F7F7F7).
-- Semi-realistic 3D, mild perspective, soft shadows, slight ink-outline OK.
-- Keep **text minimal** (prefer icons). No big paragraphs.
-- Leave ~3–5% safe margin so clipping won’t cut key elements.
+**Outgoing to next panel:** Let one cable/arrow lead out toward the electronics/PCB (P06).
 
-## 4) Assets to upload in this chat (you provide)
-**Required**
-- (A) `03_PANELS/_GLOBAL/global-context.md`
-- (B) This `context.md`
+---
 
-**Panel-specific (add as available)**
-- Reference images you want included (photos, screenshots, CAD renders).
-- Any figure crops / dataset examples relevant to this panel.
+## 1) Viewer takeaway (one sentence)
+After 3 seconds, the viewer should be able to say what crosses the boundary here (power and/or information) and *what it becomes*.
 
-**Nice-to-have**
+---
+
+## 2) What this panel MUST show (non‑negotiable)
+- A brushed‑nickel boundary sphere enclosing the mouse + joystick rig (or a simplified mouse silhouette if you prefer).
+- Clearly visible joystick end-effector and at least one sensor/actuator element (motor/brake/encoder).
+- Info arrows (cyan) exiting the boundary labeled by *types* of information (e.g., kinematics, force, events) — labels optional.
+- Power arrows (amber) entering the boundary to actuators (motor/brake).
+
+---
+
+## 3) Composition & “Unflattening” cues (make it feel like a graphic novel)
+- Semi‑realistic 3D scene with depth, perspective, and soft studio lighting.
+- Use **one strong focal object** + a few supporting objects.
+- Let arrows curve in **3D space** (not straight flat connectors).
+- Boundaries are **brushed‑nickel armillary spheres** (intersecting rings). Keep the interior visible.
+- Keep backgrounds clean (white/very light gray). Avoid heavy textures.
+
+---
+
+## 4) Assets YOU should upload in the panel‑generation chat
+
+### Always upload
+- `03_PANELS/_GLOBAL/global-context.md`
 - `00_ADMIN/style-bible-white.md`
-- `02_ASSETS/style/palette-white.svg`
-- `02_ASSETS/style/arrow-grammar.svg`
+- This file: `03_PANELS/P05_mouse_rig_boundary/context.md` (the one you’re reading)
 
-## 5) Output spec (ask the model for this)
-- Output: PNG
-- Size target: ~15.6×15.1 in equivalent framing
-- Pixels (recommended @300 dpi): 4680×4530px
-- Background: transparent if possible; otherwise pure white.
+### Panel‑specific REQUIRED uploads
+- [ ] A reference image/render of the joystick apparatus (Figure crop from the paper works well).
 
-## 6) Prompt block you can paste into the panel chat
-> Create a single comic panel illustration for a 48×48 inch poster printed on white paper. The panel must feel like semi-realistic 3D illustration with depth and soft shadows, not a flat block diagram. Use translucent spherical boundary bubbles, with crossings shown as: information = thin cyan fiber arrows (#06B6D4) and power = thick amber ribbon/tube arrows (#F59E0B). Optionally show dissipation as subtle red haze (#DC2626). Keep text minimal. 3D scene of mouse/rig; bubble boundary; show measured info out and commanded info in; power to actuators. White background or transparent. Compose with clear focal object and leave safe margins for clipping.
+### Panel‑specific OPTIONAL uploads (helps accuracy)
+- [ ] A photo of the real rig in the lab.
+- [ ] Any preferred depiction style for the mouse (photo, silhouette, stylized).
+
+### Text info to paste into the chat (if you want accuracy)
+- List of sensors at the rig boundary (encoder, force sensor, cameras, etc.).
+- List of actuators at the rig boundary (stepper motors, brake).
+
+---
+
+## 5) Output spec (so it drops into the template cleanly)
+- **Panel physical size in template:** ~15.62×15.10 inches
+- **Aspect ratio (approx):** 1.034 (W/H)
+- **Suggested render size:** 4096×3959 px (or the **largest** your image tool allows at this aspect ratio)
+- Background: **transparent** preferred; otherwise pure white (#FFFFFF).
+- Leave a ~3–5% safe margin inside edges (it will be clipped by the SVG mask).
+
+---
+
+## 6) Prompt block (copy/paste into the panel chat)
+> Create ONE comic panel illustration (semi‑realistic 3D, print‑friendly on white) for a 48×48 inch poster.  
+> Use the MBM grammar: boundaries are **3D brushed‑nickel armillary spheres** with small port collars; **information** crossings are thin metallic arrows/tubes with a cyan accent (#06B6D4); **power** crossings are thicker metallic arrows/tubes with an amber accent (#F59E0B).  
+> Avoid flat block-diagram aesthetics. Use perspective depth, soft shadows, and a clean white/very light background. Keep embedded text minimal (0–2 tiny labels max).  
+> Use any uploaded reference images faithfully where applicable (paper title page, rig photo, PCB screenshot, etc.).  
+> Panel content requirements:  
+> > - A brushed‑nickel boundary sphere enclosing the mouse + joystick rig (or a simplified mouse silhouette if you prefer).
+> - Clearly visible joystick end-effector and at least one sensor/actuator element (motor/brake/encoder).
+> - Info arrows (cyan) exiting the boundary labeled by *types* of information (e.g., kinematics, force, events) — labels optional.
+> - Power arrows (amber) entering the boundary to actuators (motor/brake).  
+> Include a subtle transition cue toward the next panel: Let one cable/arrow lead out toward the electronics/PCB (P06).
+
+---
 
 ## 7) Don’ts (negative constraints)
-- No PowerPoint look, no flat UML/SysML block diagram look.
-- No dense text. No tiny labels everywhere.
-- Avoid noisy backgrounds; keep print-friendly contrast.
+- No PowerPoint / UML / SysML block diagram look.
+- No dense paragraphs of text inside the image.
+- Don’t swap the color semantics (cyan=information, amber=power).
+- Don’t make the boundary a soap-bubble rainbow; it must read as **brushed nickel metal**.

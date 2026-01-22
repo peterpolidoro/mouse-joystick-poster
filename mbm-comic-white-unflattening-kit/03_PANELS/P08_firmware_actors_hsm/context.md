@@ -1,45 +1,84 @@
-# P08 — Firmware actors + state machines
+# P08 — Firmware: actors + hierarchical state machines
 
-## 1) Goal (viewer takeaway)
-One strong visual sentence: **MCU as stage/city; actors exchanging event packets; state machine as layered sculpture; minimal text.**
+## 0) Narrative role (why this panel exists)
+This panel explains why the system behaves deterministically and safely: firmware is an organized society of actors/state machines.
+Instead of a code listing, show firmware as a spatial, layered control structure running inside the microcontroller,
+coordinating timing, safety, and experiment orchestration.
 
-## 2) Must-use global grammar (do not change)
-- Boundary = translucent spherical bubble(s)
-- Information = cyan (#06B6D4) thin arrows/fibers
-- Power = amber (#F59E0B) thick ribbons/tubes
-- Optional dissipation = muted red (#DC2626) haze/flow
-- Artifacts = physical objects (glass cards / data crystals)
+**Incoming from previous panel:** Use a visual echo from the prior panel (artifacts, arrows, or boundary sphere) so the zoom feels continuous.
 
-## 3) Composition notes
-- White / paper-friendly background (match #FFFFFF or very light #F7F7F7).
-- Semi-realistic 3D, mild perspective, soft shadows, slight ink-outline OK.
-- Keep **text minimal** (prefer icons). No big paragraphs.
-- Leave ~3–5% safe margin so clipping won’t cut key elements.
+**Outgoing to next panel:** Have one actor/state machine connect outward to an actuator boundary (P09).
 
-## 4) Assets to upload in this chat (you provide)
-**Required**
-- (A) `03_PANELS/_GLOBAL/global-context.md`
-- (B) This `context.md`
+---
 
-**Panel-specific (add as available)**
-- Reference images you want included (photos, screenshots, CAD renders).
-- Any figure crops / dataset examples relevant to this panel.
+## 1) Viewer takeaway (one sentence)
+After 3 seconds, the viewer should be able to say what crosses the boundary here (power and/or information) and *what it becomes*.
 
-**Nice-to-have**
+---
+
+## 2) What this panel MUST show (non‑negotiable)
+- A microcontroller chip (or PCB MCU region) as a physical object.
+- Inside/around it, a diagram-like but 3D “hologram” of actors (nodes) and state machine layers (stacked translucent planes).
+- Information arrows (cyan) representing events/messages between actors.
+- Power is mostly implicit here (avoid heavy power arrows).
+
+---
+
+## 3) Composition & “Unflattening” cues (make it feel like a graphic novel)
+- Semi‑realistic 3D scene with depth, perspective, and soft studio lighting.
+- Use **one strong focal object** + a few supporting objects.
+- Let arrows curve in **3D space** (not straight flat connectors).
+- Boundaries are **brushed‑nickel armillary spheres** (intersecting rings). Keep the interior visible.
+- Keep backgrounds clean (white/very light gray). Avoid heavy textures.
+
+---
+
+## 4) Assets YOU should upload in the panel‑generation chat
+
+### Always upload
+- `03_PANELS/_GLOBAL/global-context.md`
 - `00_ADMIN/style-bible-white.md`
-- `02_ASSETS/style/palette-white.svg`
-- `02_ASSETS/style/arrow-grammar.svg`
+- This file: `03_PANELS/P08_firmware_actors_hsm/context.md` (the one you’re reading)
 
-## 5) Output spec (ask the model for this)
-- Output: PNG
-- Size target: ~9.9×7.1 in equivalent framing
-- Pixels (recommended @300 dpi): 2970×2130px
-- Background: transparent if possible; otherwise pure white.
+### Panel‑specific REQUIRED uploads
+- [ ] A list of firmware ‘actors’ (or modules) and what they do.
+- [ ] A rough state diagram screenshot OR a text description of main states (Idle, Armed, Trial, Fault, etc.).
 
-## 6) Prompt block you can paste into the panel chat
-> Create a single comic panel illustration for a 48×48 inch poster printed on white paper. The panel must feel like semi-realistic 3D illustration with depth and soft shadows, not a flat block diagram. Use translucent spherical boundary bubbles, with crossings shown as: information = thin cyan fiber arrows (#06B6D4) and power = thick amber ribbon/tube arrows (#F59E0B). Optionally show dissipation as subtle red haze (#DC2626). Keep text minimal. MCU as stage/city; actors exchanging event packets; state machine as layered sculpture; minimal text. White background or transparent. Compose with clear focal object and leave safe margins for clipping.
+### Panel‑specific OPTIONAL uploads (helps accuracy)
+- [ ] Any existing state machine diagrams or QP actor diagrams.
+- [ ] Timing details (loop rate, interrupt cadence) if you want a tiny label.
+
+### Text info to paste into the chat (if you want accuracy)
+- Actor names (e.g., ‘MotorCtrl’, ‘BrakeCtrl’, ‘Logger’, ‘TrialManager’, ‘Safety’).
+- Key states/events (e.g., ReachStart, PullThreshold, Reward).
+
+---
+
+## 5) Output spec (so it drops into the template cleanly)
+- **Panel physical size in template:** ~9.90×7.08 inches
+- **Aspect ratio (approx):** 1.397 (W/H)
+- **Suggested render size:** 4096×2932 px (or the **largest** your image tool allows at this aspect ratio)
+- Background: **transparent** preferred; otherwise pure white (#FFFFFF).
+- Leave a ~3–5% safe margin inside edges (it will be clipped by the SVG mask).
+
+---
+
+## 6) Prompt block (copy/paste into the panel chat)
+> Create ONE comic panel illustration (semi‑realistic 3D, print‑friendly on white) for a 48×48 inch poster.  
+> Use the MBM grammar: boundaries are **3D brushed‑nickel armillary spheres** with small port collars; **information** crossings are thin metallic arrows/tubes with a cyan accent (#06B6D4); **power** crossings are thicker metallic arrows/tubes with an amber accent (#F59E0B).  
+> Avoid flat block-diagram aesthetics. Use perspective depth, soft shadows, and a clean white/very light background. Keep embedded text minimal (0–2 tiny labels max).  
+> Use any uploaded reference images faithfully where applicable (paper title page, rig photo, PCB screenshot, etc.).  
+> Panel content requirements:  
+> > - A microcontroller chip (or PCB MCU region) as a physical object.
+> - Inside/around it, a diagram-like but 3D “hologram” of actors (nodes) and state machine layers (stacked translucent planes).
+> - Information arrows (cyan) representing events/messages between actors.
+> - Power is mostly implicit here (avoid heavy power arrows).  
+> Include a subtle transition cue toward the next panel: Have one actor/state machine connect outward to an actuator boundary (P09).
+
+---
 
 ## 7) Don’ts (negative constraints)
-- No PowerPoint look, no flat UML/SysML block diagram look.
-- No dense text. No tiny labels everywhere.
-- Avoid noisy backgrounds; keep print-friendly contrast.
+- No PowerPoint / UML / SysML block diagram look.
+- No dense paragraphs of text inside the image.
+- Don’t swap the color semantics (cyan=information, amber=power).
+- Don’t make the boundary a soap-bubble rainbow; it must read as **brushed nickel metal**.

@@ -1,45 +1,84 @@
-# P04 — Top-level system boundary
+# P04 — Top-level system boundary: instrument → artifacts
 
-## 1) Goal (viewer takeaway)
-One strong visual sentence: **Big boundary bubble around full instrument stack; power in (amber), info out (cyan) toward artifacts; optional dissipation haze.**
+## 0) Narrative role (why this panel exists)
+This is the first “big zoom” into the physical world: the full instrument stack (mouse rig + electronics + host computer) as one system boundary.
+The viewer should see, in one cinematic image, that the instrument consumes **power** and produces **information artifacts** (datasets/figures).
+This panel sets up the nested drill-down into sub-boundaries (rig, PCB, firmware).
 
-## 2) Must-use global grammar (do not change)
-- Boundary = translucent spherical bubble(s)
-- Information = cyan (#06B6D4) thin arrows/fibers
-- Power = amber (#F59E0B) thick ribbons/tubes
-- Optional dissipation = muted red (#DC2626) haze/flow
-- Artifacts = physical objects (glass cards / data crystals)
+**Incoming from previous panel:** Use a visual echo from the prior panel (artifacts, arrows, or boundary sphere) so the zoom feels continuous.
 
-## 3) Composition notes
-- White / paper-friendly background (match #FFFFFF or very light #F7F7F7).
-- Semi-realistic 3D, mild perspective, soft shadows, slight ink-outline OK.
-- Keep **text minimal** (prefer icons). No big paragraphs.
-- Leave ~3–5% safe margin so clipping won’t cut key elements.
+**Outgoing to next panel:** Have the camera’s depth cue emphasize the rig inside the sphere so the next panel can ‘zoom into’ the mouse+rig boundary (P05).
 
-## 4) Assets to upload in this chat (you provide)
-**Required**
-- (A) `03_PANELS/_GLOBAL/global-context.md`
-- (B) This `context.md`
+---
 
-**Panel-specific (add as available)**
-- Reference images you want included (photos, screenshots, CAD renders).
-- Any figure crops / dataset examples relevant to this panel.
+## 1) Viewer takeaway (one sentence)
+After 3 seconds, the viewer should be able to say what crosses the boundary here (power and/or information) and *what it becomes*.
 
-**Nice-to-have**
+---
+
+## 2) What this panel MUST show (non‑negotiable)
+- A large brushed‑nickel boundary sphere enclosing a recognizable 3D scene of the full system (rig + PCB + host computer + cables).
+- **Power in**: one thick metallic power arrow (amber accent) entering the boundary from a supply/battery/bench PSU.
+- **Information out**: one or more thin metallic info arrows (cyan accent) leaving the boundary toward artifact objects (datasets/figures).
+- Optional: subtle dissipation/heat shimmer near power electronics (very light).
+
+---
+
+## 3) Composition & “Unflattening” cues (make it feel like a graphic novel)
+- Semi‑realistic 3D scene with depth, perspective, and soft studio lighting.
+- Use **one strong focal object** + a few supporting objects.
+- Let arrows curve in **3D space** (not straight flat connectors).
+- Boundaries are **brushed‑nickel armillary spheres** (intersecting rings). Keep the interior visible.
+- Keep backgrounds clean (white/very light gray). Avoid heavy textures.
+
+---
+
+## 4) Assets YOU should upload in the panel‑generation chat
+
+### Always upload
+- `03_PANELS/_GLOBAL/global-context.md`
 - `00_ADMIN/style-bible-white.md`
-- `02_ASSETS/style/palette-white.svg`
-- `02_ASSETS/style/arrow-grammar.svg`
+- This file: `03_PANELS/P04_system_boundary/context.md` (the one you’re reading)
 
-## 5) Output spec (ask the model for this)
-- Output: PNG
-- Size target: ~27.1×16.1 in equivalent framing
-- Pixels (recommended @300 dpi): 8130×4830px
-- Background: transparent if possible; otherwise pure white.
+### Panel‑specific REQUIRED uploads
+- [ ] At least ONE reference image of the overall joystick rig setup OR a CAD/render of the apparatus.
 
-## 6) Prompt block you can paste into the panel chat
-> Create a single comic panel illustration for a 48×48 inch poster printed on white paper. The panel must feel like semi-realistic 3D illustration with depth and soft shadows, not a flat block diagram. Use translucent spherical boundary bubbles, with crossings shown as: information = thin cyan fiber arrows (#06B6D4) and power = thick amber ribbon/tube arrows (#F59E0B). Optionally show dissipation as subtle red haze (#DC2626). Keep text minimal. Big boundary bubble around full instrument stack; power in (amber), info out (cyan) toward artifacts; optional dissipation haze. White background or transparent. Compose with clear focal object and leave safe margins for clipping.
+### Panel‑specific OPTIONAL uploads (helps accuracy)
+- [ ] A photo of the host computer + cabling.
+- [ ] A photo/render of the PCB.
+- [ ] A photo of the power supply / battery used.
+
+### Text info to paste into the chat (if you want accuracy)
+- Top-level system name (optional).
+- Power source description (e.g., ‘12V supply’).
+
+---
+
+## 5) Output spec (so it drops into the template cleanly)
+- **Panel physical size in template:** ~27.08×17.60 inches
+- **Aspect ratio (approx):** 1.538 (W/H)
+- **Suggested render size:** 4096×2662 px (or the **largest** your image tool allows at this aspect ratio)
+- Background: **transparent** preferred; otherwise pure white (#FFFFFF).
+- Leave a ~3–5% safe margin inside edges (it will be clipped by the SVG mask).
+
+---
+
+## 6) Prompt block (copy/paste into the panel chat)
+> Create ONE comic panel illustration (semi‑realistic 3D, print‑friendly on white) for a 48×48 inch poster.  
+> Use the MBM grammar: boundaries are **3D brushed‑nickel armillary spheres** with small port collars; **information** crossings are thin metallic arrows/tubes with a cyan accent (#06B6D4); **power** crossings are thicker metallic arrows/tubes with an amber accent (#F59E0B).  
+> Avoid flat block-diagram aesthetics. Use perspective depth, soft shadows, and a clean white/very light background. Keep embedded text minimal (0–2 tiny labels max).  
+> Use any uploaded reference images faithfully where applicable (paper title page, rig photo, PCB screenshot, etc.).  
+> Panel content requirements:  
+> > - A large brushed‑nickel boundary sphere enclosing a recognizable 3D scene of the full system (rig + PCB + host computer + cables).
+> - **Power in**: one thick metallic power arrow (amber accent) entering the boundary from a supply/battery/bench PSU.
+> - **Information out**: one or more thin metallic info arrows (cyan accent) leaving the boundary toward artifact objects (datasets/figures).
+> - Optional: subtle dissipation/heat shimmer near power electronics (very light).  
+> Include a subtle transition cue toward the next panel: Have the camera’s depth cue emphasize the rig inside the sphere so the next panel can ‘zoom into’ the mouse+rig boundary (P05).
+
+---
 
 ## 7) Don’ts (negative constraints)
-- No PowerPoint look, no flat UML/SysML block diagram look.
-- No dense text. No tiny labels everywhere.
-- Avoid noisy backgrounds; keep print-friendly contrast.
+- No PowerPoint / UML / SysML block diagram look.
+- No dense paragraphs of text inside the image.
+- Don’t swap the color semantics (cyan=information, amber=power).
+- Don’t make the boundary a soap-bubble rainbow; it must read as **brushed nickel metal**.

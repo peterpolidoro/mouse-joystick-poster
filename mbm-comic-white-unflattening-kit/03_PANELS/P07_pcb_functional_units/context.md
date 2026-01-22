@@ -1,45 +1,86 @@
-# P07 — PCB functional units (motor + brake + sensing)
+# P07 — PCB internal boundaries: motor + brake control loops
 
-## 1) Goal (viewer takeaway)
-One strong visual sentence: **3D PCB with glowing zones; show power tree vs info/control loops; nested bubbles for submodules.**
+## 0) Narrative role (why this panel exists)
+This panel is where MBM becomes a design tool: inside the PCB, we draw smaller boundaries around functional units
+(driver stage, sensing front-end, microcontroller domain).
+The viewer should see at least two concrete closed loops: (1) joystick motor positioning/load, and (2) brake control,
+each with command in, feedback out, and power delivered to a physical actuator.
 
-## 2) Must-use global grammar (do not change)
-- Boundary = translucent spherical bubble(s)
-- Information = cyan (#06B6D4) thin arrows/fibers
-- Power = amber (#F59E0B) thick ribbons/tubes
-- Optional dissipation = muted red (#DC2626) haze/flow
-- Artifacts = physical objects (glass cards / data crystals)
+**Incoming from previous panel:** Use a visual echo from the prior panel (artifacts, arrows, or boundary sphere) so the zoom feels continuous.
 
-## 3) Composition notes
-- White / paper-friendly background (match #FFFFFF or very light #F7F7F7).
-- Semi-realistic 3D, mild perspective, soft shadows, slight ink-outline OK.
-- Keep **text minimal** (prefer icons). No big paragraphs.
-- Leave ~3–5% safe margin so clipping won’t cut key elements.
+**Outgoing to next panel:** Let the MCU area glow subtly as a ‘portal’ into the next panel about firmware actors/state machines (P08).
 
-## 4) Assets to upload in this chat (you provide)
-**Required**
-- (A) `03_PANELS/_GLOBAL/global-context.md`
-- (B) This `context.md`
+---
 
-**Panel-specific (add as available)**
-- Reference images you want included (photos, screenshots, CAD renders).
-- Any figure crops / dataset examples relevant to this panel.
+## 1) Viewer takeaway (one sentence)
+After 3 seconds, the viewer should be able to say what crosses the boundary here (power and/or information) and *what it becomes*.
 
-**Nice-to-have**
+---
+
+## 2) What this panel MUST show (non‑negotiable)
+- A 3D PCB as the stage (angled perspective, not a flat schematic).
+- Two highlighted functional zones with their own small brushed‑nickel boundary spheres or ring callouts:
+- • Motor drive + feedback (stepper/encoder/switch)
+- • Brake drive + feedback (current sense / status)
+- Power arrows (amber) feeding the driver stages; info arrows (cyan) between MCU ↔ drivers ↔ sensors.
+
+---
+
+## 3) Composition & “Unflattening” cues (make it feel like a graphic novel)
+- Semi‑realistic 3D scene with depth, perspective, and soft studio lighting.
+- Use **one strong focal object** + a few supporting objects.
+- Let arrows curve in **3D space** (not straight flat connectors).
+- Boundaries are **brushed‑nickel armillary spheres** (intersecting rings). Keep the interior visible.
+- Keep backgrounds clean (white/very light gray). Avoid heavy textures.
+
+---
+
+## 4) Assets YOU should upload in the panel‑generation chat
+
+### Always upload
+- `03_PANELS/_GLOBAL/global-context.md`
 - `00_ADMIN/style-bible-white.md`
-- `02_ASSETS/style/palette-white.svg`
-- `02_ASSETS/style/arrow-grammar.svg`
+- This file: `03_PANELS/P07_pcb_functional_units/context.md` (the one you’re reading)
 
-## 5) Output spec (ask the model for this)
-- Output: PNG
-- Size target: ~17.2×8.5 in equivalent framing
-- Pixels (recommended @300 dpi): 5160×2550px
-- Background: transparent if possible; otherwise pure white.
+### Panel‑specific REQUIRED uploads
+- [ ] PCB layout image (KiCad/Altium screenshot) OR a photo of the populated PCB.
+- [ ] A short list of the 2–4 most important PCB functional units to feature.
 
-## 6) Prompt block you can paste into the panel chat
-> Create a single comic panel illustration for a 48×48 inch poster printed on white paper. The panel must feel like semi-realistic 3D illustration with depth and soft shadows, not a flat block diagram. Use translucent spherical boundary bubbles, with crossings shown as: information = thin cyan fiber arrows (#06B6D4) and power = thick amber ribbon/tube arrows (#F59E0B). Optionally show dissipation as subtle red haze (#DC2626). Keep text minimal. 3D PCB with glowing zones; show power tree vs info/control loops; nested bubbles for submodules. White background or transparent. Compose with clear focal object and leave safe margins for clipping.
+### Panel‑specific OPTIONAL uploads (helps accuracy)
+- [ ] Schematic snippets for the motor driver and brake driver sections.
+- [ ] Images of the motor driver IC, brake driver components, or connectors.
+
+### Text info to paste into the chat (if you want accuracy)
+- Names of functional units (e.g., ‘MCU’, ‘Motor Driver’, ‘Brake Driver’, ‘Sensor ADC’).
+
+---
+
+## 5) Output spec (so it drops into the template cleanly)
+- **Panel physical size in template:** ~17.19×9.69 inches
+- **Aspect ratio (approx):** 1.774 (W/H)
+- **Suggested render size:** 4096×2309 px (or the **largest** your image tool allows at this aspect ratio)
+- Background: **transparent** preferred; otherwise pure white (#FFFFFF).
+- Leave a ~3–5% safe margin inside edges (it will be clipped by the SVG mask).
+
+---
+
+## 6) Prompt block (copy/paste into the panel chat)
+> Create ONE comic panel illustration (semi‑realistic 3D, print‑friendly on white) for a 48×48 inch poster.  
+> Use the MBM grammar: boundaries are **3D brushed‑nickel armillary spheres** with small port collars; **information** crossings are thin metallic arrows/tubes with a cyan accent (#06B6D4); **power** crossings are thicker metallic arrows/tubes with an amber accent (#F59E0B).  
+> Avoid flat block-diagram aesthetics. Use perspective depth, soft shadows, and a clean white/very light background. Keep embedded text minimal (0–2 tiny labels max).  
+> Use any uploaded reference images faithfully where applicable (paper title page, rig photo, PCB screenshot, etc.).  
+> Panel content requirements:  
+> > - A 3D PCB as the stage (angled perspective, not a flat schematic).
+> - Two highlighted functional zones with their own small brushed‑nickel boundary spheres or ring callouts:
+> - • Motor drive + feedback (stepper/encoder/switch)
+> - • Brake drive + feedback (current sense / status)
+> - Power arrows (amber) feeding the driver stages; info arrows (cyan) between MCU ↔ drivers ↔ sensors.  
+> Include a subtle transition cue toward the next panel: Let the MCU area glow subtly as a ‘portal’ into the next panel about firmware actors/state machines (P08).
+
+---
 
 ## 7) Don’ts (negative constraints)
-- No PowerPoint look, no flat UML/SysML block diagram look.
-- No dense text. No tiny labels everywhere.
-- Avoid noisy backgrounds; keep print-friendly contrast.
+- No PowerPoint / UML / SysML block diagram look.
+- No dense paragraphs of text inside the image.
+- Don’t swap the color semantics (cyan=information, amber=power).
+- Don’t make the boundary a soap-bubble rainbow; it must read as **brushed nickel metal**.

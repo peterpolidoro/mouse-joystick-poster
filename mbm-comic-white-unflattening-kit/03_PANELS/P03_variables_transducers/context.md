@@ -1,45 +1,86 @@
-# P03 — Reduce artifacts → variables + transducers
+# P03 — Reduce artifacts to variables + transducers
 
-## 1) Goal (viewer takeaway)
-One strong visual sentence: **Artifacts dissolve into variable glyph tiles and transducer icons; mapping arrows.**
+## 0) Narrative role (why this panel exists)
+This panel performs the key conceptual compression: figures/datasets are built from *measured and controlled variables*,
+and those variables only exist because transducers convert physical reality into signals (and signals back into physical action).
+The viewer should feel a ‘zoom’ from floating artifacts to a more technical but still cinematic layer: symbols + sensors + actuators.
 
-## 2) Must-use global grammar (do not change)
-- Boundary = translucent spherical bubble(s)
-- Information = cyan (#06B6D4) thin arrows/fibers
-- Power = amber (#F59E0B) thick ribbons/tubes
-- Optional dissipation = muted red (#DC2626) haze/flow
-- Artifacts = physical objects (glass cards / data crystals)
+**Incoming from previous panel:** Use a visual echo from the prior panel (artifacts, arrows, or boundary sphere) so the zoom feels continuous.
 
-## 3) Composition notes
-- White / paper-friendly background (match #FFFFFF or very light #F7F7F7).
-- Semi-realistic 3D, mild perspective, soft shadows, slight ink-outline OK.
-- Keep **text minimal** (prefer icons). No big paragraphs.
-- Leave ~3–5% safe margin so clipping won’t cut key elements.
+**Outgoing to next panel:** Let the variable/transducer cluster ‘pull’ the camera toward the physical rig boundary in P04/P05 (e.g., a motor icon enlarged near one edge).
 
-## 4) Assets to upload in this chat (you provide)
-**Required**
-- (A) `03_PANELS/_GLOBAL/global-context.md`
-- (B) This `context.md`
+---
 
-**Panel-specific (add as available)**
-- Reference images you want included (photos, screenshots, CAD renders).
-- Any figure crops / dataset examples relevant to this panel.
+## 1) Viewer takeaway (one sentence)
+After 3 seconds, the viewer should be able to say what crosses the boundary here (power and/or information) and *what it becomes*.
 
-**Nice-to-have**
+---
+
+## 2) What this panel MUST show (non‑negotiable)
+- A few artifact objects from P02 in the background/edge, breaking apart into:
+- • variable symbols (force F, position x, velocity, angle θ, time stamps, events)
+- • transducer icons (encoder, load cell/force sensor, motor, brake, camera)
+- One or more small brushed‑nickel boundary spheres around a ‘measurement/control layer’ subset (optional).
+- Information arrows linking transducers → variables → artifacts (cyan). Power arrows should be minimal here (save for later panels).
+
+---
+
+## 3) Composition & “Unflattening” cues (make it feel like a graphic novel)
+- Semi‑realistic 3D scene with depth, perspective, and soft studio lighting.
+- Use **one strong focal object** + a few supporting objects.
+- Let arrows curve in **3D space** (not straight flat connectors).
+- Boundaries are **brushed‑nickel armillary spheres** (intersecting rings). Keep the interior visible.
+- Keep backgrounds clean (white/very light gray). Avoid heavy textures.
+
+---
+
+## 4) Assets YOU should upload in the panel‑generation chat
+
+### Always upload
+- `03_PANELS/_GLOBAL/global-context.md`
 - `00_ADMIN/style-bible-white.md`
-- `02_ASSETS/style/palette-white.svg`
-- `02_ASSETS/style/arrow-grammar.svg`
+- This file: `03_PANELS/P03_variables_transducers/context.md` (the one you’re reading)
 
-## 5) Output spec (ask the model for this)
-- Output: PNG
-- Size target: ~7.9×10.7 in equivalent framing
-- Pixels (recommended @300 dpi): 2370×3210px
-- Background: transparent if possible; otherwise pure white.
+### Panel‑specific REQUIRED uploads
+- [ ] A list of the **key variables** (measured + controlled).
+- [ ] A list of the **transducers/actuators** (sensor/actuator names).
 
-## 6) Prompt block you can paste into the panel chat
-> Create a single comic panel illustration for a 48×48 inch poster printed on white paper. The panel must feel like semi-realistic 3D illustration with depth and soft shadows, not a flat block diagram. Use translucent spherical boundary bubbles, with crossings shown as: information = thin cyan fiber arrows (#06B6D4) and power = thick amber ribbon/tube arrows (#F59E0B). Optionally show dissipation as subtle red haze (#DC2626). Keep text minimal. Artifacts dissolve into variable glyph tiles and transducer icons; mapping arrows. White background or transparent. Compose with clear focal object and leave safe margins for clipping.
+### Panel‑specific OPTIONAL uploads (helps accuracy)
+- [ ] Photos or renders of the encoder, stepper motor, brake, load cell, etc.
+- [ ] A crop of a figure panel that shows variables (e.g., kinematics/force traces) for authenticity.
+
+### Text info to paste into the chat (if you want accuracy)
+- Variable names with units if you care (e.g., x [mm], F [g], θ [deg], t [ms]).
+- Event names (e.g., reach start, pull threshold, reward).
+
+---
+
+## 5) Output spec (so it drops into the template cleanly)
+- **Panel physical size in template:** ~7.92×10.73 inches
+- **Aspect ratio (approx):** 0.738 (W/H)
+- **Suggested render size:** 3022×4096 px (or the **largest** your image tool allows at this aspect ratio)
+- Background: **transparent** preferred; otherwise pure white (#FFFFFF).
+- Leave a ~3–5% safe margin inside edges (it will be clipped by the SVG mask).
+
+---
+
+## 6) Prompt block (copy/paste into the panel chat)
+> Create ONE comic panel illustration (semi‑realistic 3D, print‑friendly on white) for a 48×48 inch poster.  
+> Use the MBM grammar: boundaries are **3D brushed‑nickel armillary spheres** with small port collars; **information** crossings are thin metallic arrows/tubes with a cyan accent (#06B6D4); **power** crossings are thicker metallic arrows/tubes with an amber accent (#F59E0B).  
+> Avoid flat block-diagram aesthetics. Use perspective depth, soft shadows, and a clean white/very light background. Keep embedded text minimal (0–2 tiny labels max).  
+> Use any uploaded reference images faithfully where applicable (paper title page, rig photo, PCB screenshot, etc.).  
+> Panel content requirements:  
+> > - A few artifact objects from P02 in the background/edge, breaking apart into:
+> - • variable symbols (force F, position x, velocity, angle θ, time stamps, events)
+> - • transducer icons (encoder, load cell/force sensor, motor, brake, camera)
+> - One or more small brushed‑nickel boundary spheres around a ‘measurement/control layer’ subset (optional).
+> - Information arrows linking transducers → variables → artifacts (cyan). Power arrows should be minimal here (save for later panels).  
+> Include a subtle transition cue toward the next panel: Let the variable/transducer cluster ‘pull’ the camera toward the physical rig boundary in P04/P05 (e.g., a motor icon enlarged near one edge).
+
+---
 
 ## 7) Don’ts (negative constraints)
-- No PowerPoint look, no flat UML/SysML block diagram look.
-- No dense text. No tiny labels everywhere.
-- Avoid noisy backgrounds; keep print-friendly contrast.
+- No PowerPoint / UML / SysML block diagram look.
+- No dense paragraphs of text inside the image.
+- Don’t swap the color semantics (cyan=information, amber=power).
+- Don’t make the boundary a soap-bubble rainbow; it must read as **brushed nickel metal**.
