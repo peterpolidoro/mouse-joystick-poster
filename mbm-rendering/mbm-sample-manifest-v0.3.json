@@ -1,0 +1,147 @@
+{
+  "manifest_version": "mbm_render@0.3",
+  "style": {
+    "colors": {
+      "boundary": "#2B2F36",
+      "power": "#E07A1F",
+      "information": "#2A9D8F",
+      "label": "#6C757D",
+      "plane": "#FFFFFF",
+      "text": "#111111"
+    }
+  },
+  "render": {
+    "engine": "BLENDER_EEVEE",
+    "output": {
+      "width_px": 2000,
+      "height_px": 1400,
+      "background": "white"
+    },
+    "camera": {
+      "mode": "auto_isometric",
+      "projection": "ORTHO",
+      "ortho_scale": 6.0,
+      "location": [
+        3.0,
+        -3.0,
+        2.2
+      ],
+      "look_at": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "lights": {
+      "mode": "simple_3point"
+    }
+  },
+  "boundary": {
+    "entity": {
+      "id": "motor_driver",
+      "name": "Motor Driver Module"
+    },
+    "polyhedron": {
+      "type": "icosahedron",
+      "radius": {
+        "kind": "circumradius",
+        "value": 1.0
+      },
+      "wire_radius": 0.03
+    },
+    "ports": [
+      {
+        "id": "vin_24v",
+        "flow": "power",
+        "direction": "in",
+        "vertex": "auto",
+        "ray": {
+          "length": "auto",
+          "radius": 0.02
+        },
+        "endcap": {
+          "plane": {
+            "size": [
+              0.85,
+              0.45
+            ]
+          },
+          "assets": [
+            {
+              "type": "text",
+              "text": "24V IN",
+              "size": 0.2,
+              "extrude": 0.02
+            }
+          ]
+        },
+        "status": "specified",
+        "priority": 0
+      },
+      {
+        "id": "can_bus",
+        "flow": "information",
+        "direction": "bidir",
+        "vertex": "auto",
+        "ray": {
+          "length": "auto",
+          "radius": 0.018,
+          "dash": {
+            "dash_length": 0.12,
+            "gap_length": 0.08
+          }
+        },
+        "endcap": {
+          "plane": {
+            "size": [
+              0.75,
+              0.45
+            ]
+          },
+          "assets": [
+            {
+              "type": "text",
+              "text": "CAN",
+              "size": 0.18,
+              "extrude": 0.02
+            },
+            {
+              "type": "image",
+              "file": "can_icon.png"
+            }
+          ]
+        },
+        "status": "specified",
+        "priority": 2
+      }
+    ],
+    "face_labels": [
+      {
+        "id": "mcu_fw",
+        "face": "auto",
+        "ray": {
+          "length": 0.9,
+          "radius": 0.015
+        },
+        "endcap": {
+          "plane": {
+            "size": [
+              0.95,
+              0.45
+            ]
+          },
+          "assets": [
+            {
+              "type": "text",
+              "text": "MCU + FW",
+              "size": 0.16,
+              "extrude": 0.02
+            }
+          ]
+        },
+        "status": "specified",
+        "priority": 10
+      }
+    ]
+  }
+}
