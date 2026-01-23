@@ -1,0 +1,150 @@
+{
+  "manifest_version": "mbm_render@0.3",
+  "style": {
+    "colors": {
+      "boundary": "#2B2F36",
+      "power": "#E07A1F",
+      "information": "#2A9D8F",
+      "label": "#6C757D",
+      "plane": "#FFFFFF",
+      "text": "#111111"
+    }
+  },
+  "render": {
+    "engine": "BLENDER_EEVEE",
+    "output": {
+      "width_px": 2000,
+      "height_px": 1400,
+      "background": "white"
+    },
+    "camera": {
+      "projection": "ORTHO",
+      "ortho_scale": 6.0,
+      "location": [
+        3.0,
+        -3.0,
+        2.2
+      ],
+      "look_at": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "lights": {
+      "mode": "simple_3point"
+    }
+  },
+  "boundary": {
+    "entity": {
+      "id": "mbm_test",
+      "name": "MBM Test Boundary"
+    },
+    "polyhedron": {
+      "type": "icosahedron",
+      "radius": {
+        "kind": "circumradius",
+        "value": 1.0
+      },
+      "wire_radius": 0.03,
+      "vertex_radius": 0.04
+    },
+    "ports": [
+      {
+        "id": "pwr_in",
+        "flow": "power",
+        "direction": "in",
+        "vertex": "auto",
+        "ray": {
+          "length": "auto",
+          "radius": 0.02
+        },
+        "endcap": {
+          "plane": {
+            "size": [
+              0.9,
+              0.5
+            ],
+            "content_offset": 0.012
+          },
+          "assets": [
+            {
+              "type": "text",
+              "text": "POWER IN",
+              "size": 0.18,
+              "extrude": 0.02
+            }
+          ]
+        },
+        "status": "specified",
+        "priority": 0
+      },
+      {
+        "id": "usb_can",
+        "flow": "information",
+        "direction": "bidir",
+        "vertex": "auto",
+        "ray": {
+          "length": "auto",
+          "radius": 0.018,
+          "dash": {
+            "dash_length": 0.12,
+            "gap_length": 0.08
+          }
+        },
+        "endcap": {
+          "plane": {
+            "size": [
+              0.9,
+              0.5
+            ],
+            "content_offset": 0.012
+          },
+          "assets": [
+            {
+              "type": "image",
+              "file": "icon.png"
+            },
+            {
+              "type": "text",
+              "text": "INFO",
+              "size": 0.22,
+              "extrude": 0.02
+            }
+          ]
+        },
+        "status": "specified",
+        "priority": 1
+      }
+    ],
+    "face_labels": [
+      {
+        "id": "internal_fn",
+        "face": "auto",
+        "ray": {
+          "length": 0.9,
+          "radius": 0.015
+        },
+        "endcap": {
+          "plane": {
+            "size": [
+              1.1,
+              0.45
+            ],
+            "content_offset": 0.012
+          },
+          "assets": [
+            {
+              "type": "text",
+              "text": "Inside boundary",
+              "size": 0.14,
+              "extrude": 0.02
+            }
+          ]
+        },
+        "status": "specified",
+        "priority": 10
+      }
+    ]
+  }
+}
