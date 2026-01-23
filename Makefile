@@ -66,6 +66,20 @@ KICAD_SCH       ?= $(firstword $(wildcard $(REPO_ROOT)/kicad/*.kicad_sch))
 
 BLENDER_FILE    ?= $(firstword $(wildcard $(REPO_ROOT)/blender/*.blend))
 
+# MBM (Mechatronic Boundary Model) manifest-driven Blender renders
+#
+# The mbm-rendering/ directory contains a Blender-side importer that can build
+# a scene from a JSON manifest. We wrap it with a small CLI so it can be used
+# headlessly from Make.
+MBM_DIR           ?= $(REPO_ROOT)/mbm-rendering
+MBM_RENDER_CLI    ?= $(MBM_DIR)/mbm_render_cli.py
+MBM_TEST_DIR      ?= $(MBM_DIR)/test_scene
+MBM_TEST_MANIFEST ?= $(MBM_TEST_DIR)/manifest.json
+
+# Default inputs for `make mbm-render` (override from CLI)
+MBM_RENDER_MANIFEST ?= $(MBM_TEST_MANIFEST)
+MBM_RENDER_OUT      ?= $(RENDERS_DIR)/mbm-test.png
+
 POSTER_PRINT_SVG    ?= $(REPO_ROOT)/poster/print.svg
 POSTER_IPOSTER_SVG  ?= $(REPO_ROOT)/poster/iposter.svg
 POSTER_SVG        ?= $(firstword $(wildcard $(POSTER_PRINT_SVG) $(POSTER_IPOSTER_SVG) $(REPO_ROOT)/poster/*.svg))
@@ -82,6 +96,7 @@ PREVIEW_W      ?= 2400
 	freecad freecad-joystick-step freecad-pcb-step \
 	kicad pcbnew eeschema \
 	blender \
+	mbm-render mbm-render-test \
 	poster poster-print poster-iposter inkscape gimp \
 	export-print-pdf export-iposter-pdf export-print-png export-iposter-png \
 	svg-plain trim-png qr \
@@ -109,6 +124,8 @@ help:
 	"  make gimp FILE=path.xcf   Launch GIMP (optionally open a file)" \
 	"" \
 	"Exports/helpers:" \
+	"  make mbm-render MBM_RENDER_MANIFEST=path.json MBM_RENDER_OUT=output/renders/x.png  Render an MBM manifest (headless Blender)" \
+	"  make mbm-render-test        Render the included MBM test manifest" \
 	"  make export-print-pdf     Export poster/print.svg → output/exports/print.pdf" \
 	"  make export-iposter-pdf   Export poster/iposter.svg → output/exports/iposter.pdf" \
 	"  make export-print-png     Export a preview PNG (width PREVIEW_W)" \
@@ -269,6 +286,54 @@ blender: dirs
 		echo "Opening Blender (no blender/*.blend found)"; \
 		$(GUIX_SHELL) -- blender; \
 	fi
+
+# MBM renders (headless Blender) -------------------------------------------
+
+# Render an MBM scene from a manifest JSON using Blender in background mode.
+#
+# Examples:
+#   make mbm-render-test
+#   make mbm-render MBM_RENDER_MANIFEST=mbm-rendering/test_scene/manifest.json \
+#        MBM_RENDER_OUT=output/renders/mbm-test.png
+#
+# Tip: if something looks off, write a debug .blend to inspect interactively:
+#   make mbm-render MBM_RENDER_OUT=output/renders/mbm-test.png \
+#        MBM_RENDER_WRITE_BLEND=output/renders/mbm-test.blend
+MBM_RENDER_WRITE_BLEND ?=
+
+mbm-render: dirs
+	@set -e; \
+	if [ ! -f "$(MBM_RENDER_MANIFEST)" ]; then \
+		echo "Missing MBM_RENDER_MANIFEST: $(MBM_RENDER_MANIFEST)"; \
+		echo "(Tip: the repo includes $(MBM_TEST_MANIFEST))"; \
+		exit 2; \
+	fi; \
+	if [ ! -f "$(MBM_RENDER_CLI)" ]; then \
+		echo "Missing MBM_RENDER_CLI: $(MBM_RENDER_CLI)"; \
+		exit 2; \
+	fi; \
+	OUT="$(MBM_RENDER_OUT)"; \
+	if [ -z "$$OUT" ]; then \
+		echo "Set MBM_RENDER_OUT=output/path.png"; \
+		exit 2; \
+	fi; \
+	mkdir -p "$$(dirname "$$OUT")"; \
+	echo "MBM render: $(MBM_RENDER_MANIFEST) → $$OUT"; \
+	if [ -n "$(MBM_RENDER_WRITE_BLEND)" ]; then \
+		BLEND="$(MBM_RENDER_WRITE_BLEND)"; \
+		mkdir -p "$$(dirname "$$BLEND")"; \
+		$(GUIX_SHELL) -- blender -b --factory-startup --python "$(MBM_RENDER_CLI)" -- \
+			--manifest "$(MBM_RENDER_MANIFEST)" --out "$$OUT" --write-blend "$$BLEND"; \
+	else \
+		$(GUIX_SHELL) -- blender -b --factory-startup --python "$(MBM_RENDER_CLI)" -- \
+			--manifest "$(MBM_RENDER_MANIFEST)" --out "$$OUT"; \
+	fi; \
+	echo "Wrote $$OUT"
+
+mbm-render-test:
+	@$(MAKE) mbm-render \
+		MBM_RENDER_MANIFEST="$(MBM_TEST_MANIFEST)" \
+		MBM_RENDER_OUT="$(RENDERS_DIR)/mbm-test.png"
 
 # Poster/layout -------------------------------------------------------------
 
