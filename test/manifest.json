@@ -1,0 +1,25 @@
+{
+  "radius": 1.25,
+
+  "render": {
+    "engine": "CYCLES",
+    "samples": 64,
+    "resolution_x": 1024,
+    "resolution_y": 1024,
+    "file_format": "PNG",
+    "filepath": "output/render.png",
+    "transparent": true
+  },
+
+  "camera": {
+    "distance": 4.0,
+    "height": 1.6,
+    "lens_mm": 50.0
+  },
+
+  "light": {
+    "type": "SUN",
+    "energy": 3.0,
+    "location": [4.0, -4.0, 6.0]
+  }
+}
