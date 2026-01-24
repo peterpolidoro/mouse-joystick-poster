@@ -1,52 +1,84 @@
 {
-  "shape": {
-    "type": "icosphere",
-    "subdivisions": 2
-  },
-  "radius": 1.25,
-  "edges": {
-    "radius": 0.05,
-    "color": "#333333",
-    "alpha": 1.0
-  },
-  "vertices": {
-    "radius": 0.08,
-    "color": "#39FF14",
-    "alpha": 1.0
-  },
-  "faces": {
-    "thickness": 0.03,
-    "color": "#FF00FF",
-    "alpha": 0.5
-  },
-  "detail": {
-    "edge_cylinder_sides": 24,
-    "vertex_sphere_segments": 32,
-    "vertex_sphere_rings": 16
-  },
+  "objects": [
+    {
+      "name": "boundary",
+      "type": "boundary",
+      "shape": {
+        "type": "icosahedron",
+        "subdivisions": 0
+      },
+      "radius": 1.25,
+      "transform": {
+        "location": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "rotation_deg": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "scale": [
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "edges": {
+        "radius": 0.05,
+        "color": [
+          0.0,
+          1.0,
+          0.4
+        ],
+        "alpha": 1.0
+      },
+      "vertices": {
+        "radius": 0.08,
+        "color": [
+          1.0,
+          0.0,
+          1.0
+        ],
+        "alpha": 1.0
+      },
+      "faces": {
+        "thickness": 0.03,
+        "color": [
+          0.0,
+          1.0,
+          1.0
+        ],
+        "alpha": 0.1
+      },
+      "detail": {
+        "edge_cylinder_sides": 24,
+        "vertex_sphere_segments": 32,
+        "vertex_sphere_rings": 16
+      }
+    }
+  ],
   "render": {
     "engine": "CYCLES",
     "samples": 512,
+    "denoise": false,
+    "cycles": {
+      "adaptive_sampling": true,
+      "adaptive_threshold": 0.01,
+      "clamp_indirect": 10.0,
+      "max_bounces": 6
+    },
     "resolution_x": 1024,
     "resolution_y": 1024,
     "file_format": "PNG",
     "filepath": "output/render.png",
-    "transparent": true,
-    "cycles": {
-      "samples": 512,
-      "adaptive_sampling": true,
-      "adaptive_threshold": 0.01,
-      "clamp_indirect": 10.0,
-      "max_bounces": 6,
-      "denoise": false
-    },
-    "eevee": {
-      "taa_render_samples": 64
-    }
+    "transparent": true
   },
   "camera": {
     "distance": 4.8,
     "lens_mm": 50.0,
+    "roll_deg": 13.0,
     "target": [
       0.0,
       0.0,
