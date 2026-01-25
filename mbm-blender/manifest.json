@@ -1,0 +1,331 @@
+{
+  "manifest_version": 1,
+  "seed": 1337,
+  "boards": {
+    "plane_mode": "CAMERA"
+  },
+  "objects": [
+    {
+      "name": "boundary",
+      "type": "boundary",
+      "shape": {
+        "type": "icosahedron",
+        "subdivisions": 0
+      },
+      "radius": 1.25,
+      "edges": {
+        "radius": 0.05,
+        "color": "#00FF66",
+        "alpha": 1.0
+      },
+      "vertices": {
+        "radius": 0.08,
+        "color": "#FF00FF",
+        "alpha": 1.0
+      },
+      "faces": {
+        "thickness": 0.03,
+        "color": "#00FFFF",
+        "alpha": 0.1
+      },
+      "detail": {
+        "edge_cylinder_sides": 24,
+        "vertex_sphere_segments": 32,
+        "vertex_sphere_rings": 16,
+        "edge_coplanar_dot": 0.999999
+      }
+    },
+    {
+      "name": "scientists",
+      "type": "label",
+      "target": "boundary",
+      "direction": "OUT",
+      "attach": {
+        "site_type": "FACE",
+        "index": null
+      },
+      "auto_placement": {
+        "enabled": true,
+        "require_visible_base": true,
+        "require_tip_in_frame": true
+      },
+      "cylinder": {
+        "radius": 0.02,
+        "length": "AUTO",
+        "length_min": 0.35,
+        "length_max": 0.95,
+        "color": "#FFFFFF",
+        "alpha": 0.65,
+        "sides": 20
+      },
+      "board": {
+        "gap": "AUTO"
+      },
+      "text": {
+        "value": "MCU",
+        "size": 0.35,
+        "color": "#FFFFFF",
+        "alpha": 1.0,
+        "extrude": 0.0,
+        "align_x": "CENTER"
+      },
+      "image": {
+        "filepath": null,
+        "height": 0.4,
+        "alpha": 1.0
+      },
+      "layout": {
+        "image_above_text": true,
+        "spacing": 0.05,
+        "padding": 0.04
+      }
+    },
+    {
+      "name": "port_pwr_in",
+      "type": "port",
+      "target": "boundary",
+      "attach": {
+        "site_type": "VERTEX",
+        "index": null
+      },
+      "flow": {
+        "kind": "POWER",
+        "direction": "IN"
+      },
+      "auto_placement": {
+        "enabled": true,
+        "require_visible_base": true,
+        "require_tip_in_frame": true
+      },
+      "cylinder": {
+        "radius": 0.03,
+        "length": "AUTO",
+        "length_min": 0.7,
+        "length_max": 2.5,
+        "color": "#FFD166",
+        "alpha": 1.0,
+        "sides": 24,
+        "base_offset": "AUTO"
+      },
+      "arrow": {
+        "enabled": true,
+        "length": 0.18,
+        "radius": 0.07
+      },
+      "board": {
+        "gap": "AUTO"
+      },
+      "text": {
+        "value": "PWR IN",
+        "size": 0.28,
+        "color": "#FFFFFF",
+        "alpha": 1.0,
+        "extrude": 0.0,
+        "align_x": "CENTER"
+      },
+      "image": {
+        "filepath": null,
+        "height": 0.5,
+        "alpha": 1.0
+      },
+      "layout": {
+        "image_above_text": true,
+        "spacing": 0.05,
+        "padding": 0.04
+      }
+    },
+    {
+      "name": "port_pwr_out",
+      "type": "port",
+      "target": "boundary",
+      "attach": {
+        "site_type": "VERTEX",
+        "index": null
+      },
+      "flow": {
+        "kind": "POWER",
+        "direction": "OUT"
+      },
+      "auto_placement": {
+        "enabled": true,
+        "require_visible_base": true,
+        "require_tip_in_frame": true
+      },
+      "cylinder": {
+        "radius": 0.03,
+        "length": "AUTO",
+        "length_min": 0.7,
+        "length_max": 2.5,
+        "color": "#F8961E",
+        "alpha": 1.0,
+        "sides": 24,
+        "base_offset": "AUTO"
+      },
+      "arrow": {
+        "enabled": true,
+        "length": 0.18,
+        "radius": 0.07
+      },
+      "board": {
+        "gap": "AUTO"
+      },
+      "text": {
+        "value": "PWR OUT",
+        "size": 0.28,
+        "color": "#FFFFFF",
+        "alpha": 1.0,
+        "extrude": 0.0,
+        "align_x": "CENTER"
+      },
+      "image": {
+        "filepath": null,
+        "height": 0.5,
+        "alpha": 1.0
+      },
+      "layout": {
+        "image_above_text": true,
+        "spacing": 0.05,
+        "padding": 0.04
+      }
+    },
+    {
+      "name": "port_info_in",
+      "type": "port",
+      "target": "boundary",
+      "attach": {
+        "site_type": "VERTEX",
+        "index": null
+      },
+      "flow": {
+        "kind": "INFO",
+        "direction": "IN"
+      },
+      "auto_placement": {
+        "enabled": true,
+        "require_visible_base": true,
+        "require_tip_in_frame": true
+      },
+      "cylinder": {
+        "radius": 0.02,
+        "length": "AUTO",
+        "length_min": 0.6,
+        "length_max": 2.2,
+        "color": "#00D1FF",
+        "alpha": 1.0,
+        "sides": 24,
+        "base_offset": "AUTO"
+      },
+      "arrow": {
+        "enabled": true,
+        "length": 0.16,
+        "radius": 0.06
+      },
+      "board": {
+        "gap": "AUTO"
+      },
+      "text": {
+        "value": "INFO IN",
+        "size": 0.26,
+        "color": "#FFFFFF",
+        "alpha": 1.0,
+        "extrude": 0.0,
+        "align_x": "CENTER"
+      },
+      "image": {
+        "filepath": null,
+        "height": 0.45,
+        "alpha": 1.0
+      },
+      "layout": {
+        "image_above_text": true,
+        "spacing": 0.05,
+        "padding": 0.04
+      }
+    },
+    {
+      "name": "paper",
+      "type": "port",
+      "target": "boundary",
+      "attach": {
+        "site_type": "VERTEX",
+        "index": null
+      },
+      "flow": {
+        "kind": "INFO",
+        "direction": "OUT"
+      },
+      "auto_placement": {
+        "enabled": true,
+        "require_visible_base": true,
+        "require_tip_in_frame": true
+      },
+      "cylinder": {
+        "radius": 0.02,
+        "length": "AUTO",
+        "length_min": 0.6,
+        "length_max": 2.2,
+        "color": "#06D6A0",
+        "alpha": 1.0,
+        "sides": 24,
+        "base_offset": "AUTO"
+      },
+      "arrow": {
+        "enabled": true,
+        "length": 0.16,
+        "radius": 0.06
+      },
+      "board": {
+        "gap": "AUTO"
+      },
+      "text": {
+        "value": "INFO OUT",
+        "size": 0.26,
+        "color": "#FFFFFF",
+        "alpha": 1.0,
+        "extrude": 0.0,
+        "align_x": "CENTER"
+      },
+      "image": {
+        "filepath": null,
+        "height": 0.45,
+        "alpha": 1.0
+      },
+      "layout": {
+        "image_above_text": true,
+        "spacing": 0.05,
+        "padding": 0.04
+      }
+    }
+  ],
+  "camera": {
+    "mode": "AUTO_NON_SYMMETRIC",
+    "type": "PERSP",
+    "lens_mm": 50.0,
+    "distance": 4.8,
+    "target": "AUTO"
+  },
+  "light": {
+    "type": "SUN",
+    "rotation_deg": [
+      45,
+      0,
+      -35
+    ],
+    "energy": 3.0,
+    "color": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "render": {
+    "engine": "BLENDER_EEVEE",
+    "resolution": [
+      1600,
+      1000
+    ],
+    "transparent_background": true,
+    "output_filepath": "renders/mbm_example.png",
+    "file_format": "PNG"
+  }
+}
