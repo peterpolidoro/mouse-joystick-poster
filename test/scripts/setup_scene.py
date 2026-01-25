@@ -100,12 +100,6 @@ def scene_and_root_collection():
 
 
 def clear_scene_data():
-    # Clear any in-module caches that may hold references to datablocks we are about to delete.
-    # This prevents errors like: ReferenceError('StructRNA of type Mesh has been removed')
-    try:
-        _mesh_cache.clear()
-    except Exception:
-        pass
     # Remove objects
     for obj in list(bpy.data.objects):
         bpy.data.objects.remove(obj, do_unlink=True)
@@ -309,12 +303,8 @@ _mesh_cache: Dict[str, bpy.types.Mesh] = {}
 
 def unit_plane_mesh() -> bpy.types.Mesh:
     key = "unit_plane"
-    if key in _mesh_cache:
-        try:
-            if _mesh_cache[key].name in bpy.data.meshes:
-                return _mesh_cache[key]
-        except ReferenceError:
-            _mesh_cache.pop(key, None)
+    if key in _mesh_cache and _mesh_cache[key].name in bpy.data.meshes:
+        return _mesh_cache[key]
 
     # 1x1 plane centered at origin in XY, normal +Z
     verts = [(-0.5, -0.5, 0.0), (0.5, -0.5, 0.0), (0.5, 0.5, 0.0), (-0.5, 0.5, 0.0)]
@@ -329,12 +319,8 @@ def unit_plane_mesh() -> bpy.types.Mesh:
 def unit_cylinder_mesh(sides: int, cap_ends: bool = True) -> bpy.types.Mesh:
     sides = max(3, int(sides))
     key = f"unit_cyl_{sides}_{int(cap_ends)}"
-    if key in _mesh_cache:
-        try:
-            if _mesh_cache[key].name in bpy.data.meshes:
-                return _mesh_cache[key]
-        except ReferenceError:
-            _mesh_cache.pop(key, None)
+    if key in _mesh_cache and _mesh_cache[key].name in bpy.data.meshes:
+        return _mesh_cache[key]
 
     verts: List[Tuple[float, float, float]] = []
     faces: List[Tuple[int, ...]] = []
@@ -385,12 +371,8 @@ def unit_uv_sphere_mesh(segments: int, rings: int) -> bpy.types.Mesh:
     segs = max(3, int(segments))
     rcount = max(3, int(rings))
     key = f"unit_sphere_{segs}_{rcount}"
-    if key in _mesh_cache:
-        try:
-            if _mesh_cache[key].name in bpy.data.meshes:
-                return _mesh_cache[key]
-        except ReferenceError:
-            _mesh_cache.pop(key, None)
+    if key in _mesh_cache and _mesh_cache[key].name in bpy.data.meshes:
+        return _mesh_cache[key]
 
     verts: List[Tuple[float, float, float]] = []
     faces: List[Tuple[int, int, int]] = []
@@ -1227,7 +1209,21 @@ def choose_face_and_length_for_label(
         if forced_type == "FACE" and forced_idx is not None and int(poly.index) != int(forced_idx):
             continue
 
-        base_w = mw @ poly.center
+        tri_center_w = mw @ poly.center
+
+        # Use the face normal so labels are perpendicular to planar polygon faces
+        # (cube squares, dodecahedron pentagons) even though the solid mesh is triangulated.
+        # Transform normals with inverse-transpose to handle object scaling correctly.
+        nmat = mw.to_3x3().inverted().transposed()
+        dir_w = (nmat @ poly.normal).normalized()
+        # Ensure the direction points outward (away from the polyhedron center)
+        if dir_w.dot(tri_center_w - center_w) < 0.0:
+            dir_w = -dir_w
+
+        # Project the polyhedron center onto the face plane to get a stable face-center
+        # point (works for regular solids; avoids triangle-centroid bias).
+        dist = dir_w.dot(tri_center_w - center_w)
+        base_w = center_w + dir_w * dist
 
         base_ndc, base_in = ndc_and_in_frame(scene, cam_obj, base_w)
         if not base_in:
@@ -1236,11 +1232,6 @@ def choose_face_and_length_for_label(
         if require_visible_base:
             if not visible_on_solid_from_camera(scene, cam_obj, solid_obj, solid_bvh, base_w):
                 continue
-
-        d = base_w - center_w
-        if d.length < 1e-9:
-            continue
-        dir_w = d.normalized()
 
         base_px, _, _ = ndc_to_px(scene, base_ndc)
         silhouette = (base_px - center_px).length
@@ -1294,9 +1285,13 @@ def choose_face_and_length_for_label(
         best_poly = mesh.polygons[0] if mesh.polygons else None
         if best_poly is None:
             raise RuntimeError("Boundary has no faces to attach label to.")
-        base_w = mw @ best_poly.center
-        d = base_w - center_w
-        dir_w = d.normalized() if d.length > 1e-9 else Vector((0, 0, 1))
+        tri_center_w = mw @ best_poly.center
+        nmat = mw.to_3x3().inverted().transposed()
+        dir_w = (nmat @ best_poly.normal).normalized()
+        if dir_w.dot(tri_center_w - center_w) < 0.0:
+            dir_w = -dir_w
+        dist = dir_w.dot(tri_center_w - center_w)
+        base_w = center_w + dir_w * dist
         L = float(L_min)
         tip_w = base_w + dir_w * (base_offset + L)
         best = LabelPlacement(face_index=int(best_poly.index), base_w=base_w, dir_w=dir_w, length=L, tip_w=tip_w)

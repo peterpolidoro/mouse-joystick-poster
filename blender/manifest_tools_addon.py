@@ -1,25 +1,25 @@
 # manifest_tools_addon.py
-# Blender Add-on: Manifest Tools (v0.4)
+# Blender Add-on: Manifest Tools (v0.5)
 #
-# New in v0.4:
-#   - Auto-fill Manifest Path and Builder Script Path from Blender command-line args:
-#       --python / -P <builder.py>  and  -- --manifest <manifest.json>
-#   - "Reload builder on Apply" option (default ON) to avoid stale global caches in builder scripts
-#     (fixes: ReferenceError('StructRNA of type Mesh has been removed') when rebuilding repeatedly)
-#   - Explicit "Use CLI Paths" operator button
+# Adds:
+#   - Auto-fill + Auto-load manifest from CLI args:
+#       blender --python / -P <builder.py> -- --manifest <manifest.json>
+#   - Label Face Picking in 3D View:
+#       Click "Pick Face" then click on the boundary in the viewport.
+#       The operator ray-casts against the hidden "<boundary>_Solid" mesh and sets attach.index.
+#   - Shows "Resolved Face" after apply (reads label root custom property attach_index if present)
 #
-# UI locations:
-#   - View3D Sidebar (N) -> Tool tab -> Manifest Tools
-#   - Properties editor -> Scene tab -> Manifest Tools
+# Also retains:
+#   - Safe Apply rollback
+#   - Reload Builder on Apply (default ON) to avoid stale Mesh references
 #
 # Requirements:
-#   Your builder script defines:
-#     build_scene_from_manifest(manifest: dict, project_root: str, do_render: bool)
+#   Your builder script defines build_scene_from_manifest(manifest, project_root, do_render)
 
 bl_info = {
     "name": "Manifest Tools (Boundary/Label)",
     "author": "ChatGPT",
-    "version": (0, 4, 0),
+    "version": (0, 5, 0),
     "blender": (3, 6, 0),
     "location": "View3D > Sidebar > Tool ; Properties > Scene",
     "description": "Edit scene manifest in Blender, apply and save for headless renders.",
@@ -44,9 +44,13 @@ from bpy.props import (
 )
 from bpy.types import Operator, Panel, PropertyGroup, UIList
 
+from mathutils import Vector
+from mathutils.bvhtree import BVHTree
+from bpy_extras import view3d_utils
+
 
 # -----------------------------
-# Globals (debounce + builder cache)
+# Globals
 # -----------------------------
 
 _IS_LOADING = False
@@ -104,7 +108,6 @@ def _abspath_from_cwd(p: str) -> str:
     p = bpy.path.abspath(p)
     if os.path.isabs(p):
         return os.path.abspath(p)
-    # relative: interpret relative to current working directory (matches typical CLI usage)
     return os.path.abspath(os.path.join(os.getcwd(), p))
 
 
@@ -121,23 +124,20 @@ def _guess_builder_path(manifest_path: str) -> str:
 def _parse_cli_paths() -> tuple[str, str]:
     """
     Extract (builder_path, manifest_path) from Blender's sys.argv.
-    We support:
+    Supports:
       blender --python path/to/setup_scene.py -- --manifest path/to/manifest.json
       blender -P path/to/setup_scene.py -- --manifest path/to/manifest.json
-
     Also supports --manifest=... form.
     """
     argv = list(sys.argv)
     builder = ""
     manifest = ""
 
-    # Builder path: --python or -P
     for i, a in enumerate(argv):
         if a in ("--python", "-P"):
             if i + 1 < len(argv):
                 builder = argv[i + 1]
 
-    # Manifest path: --manifest or --manifest=...
     for i, a in enumerate(argv):
         if a == "--manifest" and i + 1 < len(argv):
             manifest = argv[i + 1]
@@ -153,18 +153,13 @@ def _load_builder_module(builder_path: str, force_reload: bool = False):
 
     mod_name = _BUILDER_CACHE["mod_name"]
 
-    # If same path and cached, reuse unless force_reload
-    if (
-        not force_reload
-        and _BUILDER_CACHE["module"] is not None
-        and _BUILDER_CACHE["path"] == builder_path
-    ):
+    if (not force_reload and _BUILDER_CACHE["module"] is not None and _BUILDER_CACHE["path"] == builder_path):
         return _BUILDER_CACHE["module"]
 
     if not os.path.exists(builder_path):
         raise FileNotFoundError(f"Builder script not found: {builder_path}")
 
-    # Remove old module from sys.modules to truly reload and clear its globals (mesh caches, etc.)
+    # hard reload: remove from sys.modules to clear globals (mesh caches)
     if mod_name in sys.modules:
         try:
             del sys.modules[mod_name]
@@ -188,8 +183,7 @@ def _schedule_live_update(context):
     global _UPDATE_TIMER_ACTIVE
     if _IS_LOADING:
         return
-    scene = context.scene
-    props = scene.manifest_tools
+    props = context.scene.manifest_tools
     if not props.live_update:
         return
     if _UPDATE_TIMER_ACTIVE:
@@ -255,15 +249,7 @@ class MT_BoundaryProps(PropertyGroup):
     edge_cylinder_sides: IntProperty(name="Edge Sides", default=24, min=3, max=128, update=_on_prop_update)
     vertex_sphere_segments: IntProperty(name="Sphere Segments", default=32, min=3, max=128, update=_on_prop_update)
     vertex_sphere_rings: IntProperty(name="Sphere Rings", default=16, min=3, max=128, update=_on_prop_update)
-    edge_coplanar_dot: FloatProperty(
-        name="Coplanar Dot",
-        default=0.999999,
-        min=0.9,
-        max=1.0,
-        precision=6,
-        update=_on_prop_update,
-        description="Remove triangulation diagonals by treating shared triangle edges as internal if normals are coplanar (dot close to 1).",
-    )
+    edge_coplanar_dot: FloatProperty(name="Coplanar Dot", default=0.999999, min=0.9, max=1.0, precision=6, update=_on_prop_update)
 
 
 class MT_CameraProps(PropertyGroup):
@@ -275,10 +261,7 @@ class MT_CameraProps(PropertyGroup):
 
     target_mode: EnumProperty(
         name="Target",
-        items=[
-            ("AUTO", "AUTO (Boundary Center)", ""),
-            ("CUSTOM", "Custom", ""),
-        ],
+        items=[("AUTO", "AUTO (Boundary Center)", ""), ("CUSTOM", "Custom", "")],
         default="AUTO",
         update=_on_prop_update,
     )
@@ -289,23 +272,11 @@ class MT_LabelProps(PropertyGroup):
     name: StringProperty(name="Name", default="label_01", update=_on_prop_update)
     target: StringProperty(name="Target Boundary", default="boundary", update=_on_prop_update)
 
-    attach_face_index: IntProperty(
-        name="Face Index",
-        default=-1,
-        min=-1,
-        description="-1 means auto-select a visible face",
-        update=_on_prop_update,
-    )
+    attach_face_index: IntProperty(name="Face Index", default=-1, min=-1, description="-1 means auto-select", update=_on_prop_update)
 
-    # Cylinder
     cyl_radius: FloatProperty(name="Radius", default=0.03, min=0.0001, soft_max=1.0, update=_on_prop_update)
 
-    cyl_length_mode: EnumProperty(
-        name="Length",
-        items=[("AUTO", "AUTO", ""), ("FIXED", "Fixed", "")],
-        default="AUTO",
-        update=_on_prop_update,
-    )
+    cyl_length_mode: EnumProperty(name="Length", items=[("AUTO", "AUTO", ""), ("FIXED", "Fixed", "")], default="AUTO", update=_on_prop_update)
     cyl_length: FloatProperty(name="Fixed", default=1.2, min=0.01, soft_max=10.0, update=_on_prop_update)
     cyl_length_min: FloatProperty(name="Min", default=0.6, min=0.01, soft_max=10.0, update=_on_prop_update)
     cyl_length_max: FloatProperty(name="Max", default=2.8, min=0.01, soft_max=20.0, update=_on_prop_update)
@@ -313,14 +284,12 @@ class MT_LabelProps(PropertyGroup):
     cyl_color: FloatVectorProperty(name="Color", subtype="COLOR", size=3, default=(1.0, 1.0, 1.0), min=0.0, max=1.0, update=_on_prop_update)
     cyl_alpha: FloatProperty(name="Alpha", default=1.0, min=0.0, max=1.0, update=_on_prop_update)
 
-    # Text
     text_value: StringProperty(name="Text", default="Icosahedron", update=_on_prop_update)
     text_size: FloatProperty(name="Size", default=0.30, min=0.01, soft_max=2.0, update=_on_prop_update)
     text_color: FloatVectorProperty(name="Color", subtype="COLOR", size=3, default=(1.0, 1.0, 1.0), min=0.0, max=1.0, update=_on_prop_update)
     text_alpha: FloatProperty(name="Alpha", default=1.0, min=0.0, max=1.0, update=_on_prop_update)
     font_path: StringProperty(name="Font", subtype="FILE_PATH", default="", update=_on_prop_update)
 
-    # Image
     image_filepath: StringProperty(name="Image", subtype="FILE_PATH", default="", update=_on_prop_update)
     image_height: FloatProperty(name="Height", default=0.55, min=0.01, soft_max=5.0, update=_on_prop_update)
     image_alpha: FloatProperty(name="Alpha", default=1.0, min=0.0, max=1.0, update=_on_prop_update)
@@ -328,36 +297,33 @@ class MT_LabelProps(PropertyGroup):
 
 class MT_ToolsProps(PropertyGroup):
     manifest_path: StringProperty(name="Manifest Path", subtype="FILE_PATH", default="")
-    builder_path: StringProperty(
-        name="Builder Script",
-        subtype="FILE_PATH",
-        default="",
-        description="Path to setup_scene.py that provides build_scene_from_manifest(). Leave blank to auto-guess relative to manifest.",
+    builder_path: StringProperty(name="Builder Script", subtype="FILE_PATH", default="")
+
+    auto_load_manifest_on_startup: BoolProperty(
+        name="Auto-load Manifest",
+        default=True,
+        description="If CLI args provide --manifest, load it automatically into the UI on startup.",
     )
 
-    # New in v0.4
     reload_builder_each_apply: BoolProperty(
         name="Reload Builder on Apply",
         default=True,
-        description="Reloads the builder python module on every Apply to clear its global caches (recommended).",
+        description="Reload builder module on every Apply to clear its globals (prevents removed-mesh errors).",
     )
 
-    live_update: BoolProperty(
-        name="Live Update",
-        default=False,
-        description="When enabled, applying is triggered automatically (debounced) when you change any property.",
+    # Face picking behavior
+    pick_face_auto_apply: BoolProperty(
+        name="Auto Apply after Pick",
+        default=True,
+        description="After picking a face, automatically Apply to rebuild label at that face.",
     )
-    live_update_delay: FloatProperty(
-        name="Delay (s)",
-        default=0.25,
-        min=0.05,
-        max=2.0,
-        description="Debounce delay for Live Update",
-    )
+
+    live_update: BoolProperty(name="Live Update", default=False, description="Auto-apply after changes (debounced)")
+    live_update_delay: FloatProperty(name="Delay (s)", default=0.25, min=0.05, max=2.0)
 
     raw_manifest_json: StringProperty(name="(internal) raw manifest", default="", options={'HIDDEN'})
-    last_good_manifest_json: StringProperty(name="(internal) last good manifest", default="", options={'HIDDEN'})
-    last_status: StringProperty(name="(internal) last status", default="", options={'HIDDEN'})
+    last_good_manifest_json: StringProperty(name="(internal) last good", default="", options={'HIDDEN'})
+    last_status: StringProperty(name="(internal) status", default="", options={'HIDDEN'})
 
     boundary: PointerProperty(type=MT_BoundaryProps)
     camera: PointerProperty(type=MT_CameraProps)
@@ -369,21 +335,6 @@ class MT_ToolsProps(PropertyGroup):
 # -----------------------------
 # Manifest ↔ props conversion
 # -----------------------------
-
-def _find_object(manifest: dict, name: str = None, type_name: str = None):
-    objs = manifest.get("objects", [])
-    if not isinstance(objs, list):
-        return None
-    for o in objs:
-        if not isinstance(o, dict):
-            continue
-        if name is not None and o.get("name") != name:
-            continue
-        if type_name is not None and str(o.get("type", "")).lower() != str(type_name).lower():
-            continue
-        return o
-    return None
-
 
 def _find_objects(manifest: dict, type_name: str):
     objs = manifest.get("objects", [])
@@ -415,12 +366,10 @@ def load_manifest_into_props(manifest: dict, props: MT_ToolsProps):
     global _IS_LOADING
     _IS_LOADING = True
     try:
-        b = _find_object(manifest, name=props.boundary.name, type_name="boundary")
-        if b is None:
-            bs = _find_objects(manifest, "boundary")
-            b = bs[0] if bs else None
-
-        if b is not None:
+        # Boundary: first boundary object
+        b_list = _find_objects(manifest, "boundary")
+        if b_list:
+            b = b_list[0]
             props.boundary.name = str(b.get("name", props.boundary.name))
             props.boundary.radius = float(b.get("radius", props.boundary.radius))
 
@@ -451,18 +400,15 @@ def load_manifest_into_props(manifest: dict, props: MT_ToolsProps):
             props.boundary.vertex_sphere_rings = int(detail.get("vertex_sphere_rings", props.boundary.vertex_sphere_rings))
             props.boundary.edge_coplanar_dot = float(detail.get("edge_coplanar_dot", props.boundary.edge_coplanar_dot))
 
-        # Camera
         cam = manifest.get("camera", {}) if isinstance(manifest.get("camera", {}), dict) else {}
         props.camera.lens_mm = float(cam.get("lens_mm", props.camera.lens_mm))
         props.camera.distance = float(cam.get("distance", props.camera.distance))
-
         if isinstance(cam.get("location", None), (list, tuple)) and len(cam.get("location")) >= 3:
             props.camera.use_location = True
             loc = cam.get("location")
             props.camera.location = (float(loc[0]), float(loc[1]), float(loc[2]))
         else:
             props.camera.use_location = False
-
         tgt = cam.get("target", "AUTO")
         if isinstance(tgt, str) and tgt.upper() == "AUTO":
             props.camera.target_mode = "AUTO"
@@ -472,7 +418,6 @@ def load_manifest_into_props(manifest: dict, props: MT_ToolsProps):
         else:
             props.camera.target_mode = "AUTO"
 
-        # Labels
         props.labels.clear()
         lbls = _find_objects(manifest, "label")
         for l in lbls:
@@ -509,7 +454,7 @@ def load_manifest_into_props(manifest: dict, props: MT_ToolsProps):
             item.image_height = float(img.get("height", item.image_height))
             item.image_alpha = float(img.get("alpha", item.image_alpha))
 
-        props.active_label_index = 0 if len(props.labels) > 0 else -1
+        props.active_label_index = 0 if len(props.labels) else -1
 
     finally:
         _IS_LOADING = False
@@ -544,7 +489,7 @@ def update_manifest_from_props(manifest: dict, props: MT_ToolsProps) -> dict:
             del cam["location"]
     cam["target"] = "AUTO" if props.camera.target_mode == "AUTO" else [float(props.camera.target[0]), float(props.camera.target[1]), float(props.camera.target[2])]
 
-    # Labels
+    # Labels: merge by name, keep extras
     objs = manifest.get("objects", [])
     if not isinstance(objs, list):
         objs = []
@@ -629,13 +574,28 @@ def _load_json_str(s: str) -> dict:
     return {"manifest_version": 1, "objects": []}
 
 
-def apply_scene_from_props(context, safe: bool = True):
-    scene = context.scene
-    props = scene.manifest_tools
+def fill_paths_from_cli(props: MT_ToolsProps) -> bool:
+    builder_cli, manifest_cli = _parse_cli_paths()
+    changed = False
 
-    if not props.manifest_path.strip():
-        raise RuntimeError("Manifest Path is empty.")
+    if manifest_cli and not props.manifest_path.strip():
+        props.manifest_path = _abspath_from_cwd(manifest_cli)
+        changed = True
 
+    if builder_cli and not props.builder_path.strip():
+        props.builder_path = _abspath_from_cwd(builder_cli)
+        changed = True
+
+    if props.manifest_path.strip() and not props.builder_path.strip():
+        guess = _guess_builder_path(_abspath_from_cwd(props.manifest_path))
+        if guess:
+            props.builder_path = guess
+            changed = True
+
+    return changed
+
+
+def _run_build(props: MT_ToolsProps, manifest_obj: dict, force_reload: bool):
     manifest_path = _abspath_from_cwd(props.manifest_path)
     project_root = os.path.dirname(manifest_path)
 
@@ -644,33 +604,38 @@ def apply_scene_from_props(context, safe: bool = True):
     if not builder_path:
         builder_path = _guess_builder_path(manifest_path)
     if not builder_path:
-        raise RuntimeError("Builder Script not set, and auto-guess failed. Set it in the panel.")
+        raise RuntimeError("Builder Script path is empty; set it in the panel.")
+
+    module = _load_builder_module(builder_path, force_reload=force_reload)
+    if not hasattr(module, "build_scene_from_manifest"):
+        raise RuntimeError(f"Builder {builder_path} does not define build_scene_from_manifest().")
+
+    module.build_scene_from_manifest(manifest_obj, project_root=project_root, do_render=False)
+
+
+def apply_scene_from_props(context, safe: bool = True):
+    props = context.scene.manifest_tools
+
+    if not props.manifest_path.strip():
+        raise RuntimeError("Manifest Path is empty.")
 
     base_manifest = _load_json_str(props.raw_manifest_json)
     new_manifest = update_manifest_from_props(base_manifest, props)
-
     props.raw_manifest_json = json.dumps(new_manifest, indent=2)
 
     last_good = _load_json_str(props.last_good_manifest_json) if props.last_good_manifest_json.strip() else None
 
-    def _run_build(manifest_obj: dict, force_reload: bool):
-        module = _load_builder_module(builder_path, force_reload=force_reload)
-        if not hasattr(module, "build_scene_from_manifest"):
-            raise RuntimeError(f"Builder {builder_path} does not define build_scene_from_manifest().")
-        module.build_scene_from_manifest(manifest_obj, project_root=project_root, do_render=False)
-
     force_reload = bool(props.reload_builder_each_apply)
 
     try:
-        _run_build(new_manifest, force_reload=force_reload)
+        _run_build(props, new_manifest, force_reload=force_reload)
         props.last_good_manifest_json = props.raw_manifest_json
         props.last_status = "Applied OK"
     except ReferenceError as e:
-        # Very common when builder caches meshes and then deletes them on rebuild.
-        # Retry once with a forced reload (clears builder globals).
+        # Retry with reload, and then restore last_good on failure
         props.last_status = f"Apply FAILED (ReferenceError): {e!r} — retrying with reload"
         try:
-            _run_build(new_manifest, force_reload=True)
+            _run_build(props, new_manifest, force_reload=True)
             props.last_good_manifest_json = props.raw_manifest_json
             props.last_status = "Applied OK (after reload retry)"
             return
@@ -678,7 +643,7 @@ def apply_scene_from_props(context, safe: bool = True):
             props.last_status = f"Apply FAILED after reload retry: {e2!r}"
             if safe and last_good is not None:
                 try:
-                    _run_build(last_good, force_reload=True)
+                    _run_build(props, last_good, force_reload=True)
                     props.last_status += " (restored last good)"
                 except Exception as e3:
                     props.last_status += f" (restore failed: {e3!r})"
@@ -687,7 +652,7 @@ def apply_scene_from_props(context, safe: bool = True):
         props.last_status = f"Apply FAILED: {e!r}"
         if safe and last_good is not None:
             try:
-                _run_build(last_good, force_reload=True)
+                _run_build(props, last_good, force_reload=True)
                 props.last_status += " (restored last good)"
             except Exception as e2:
                 props.last_status += f" (restore failed: {e2!r})"
@@ -695,8 +660,7 @@ def apply_scene_from_props(context, safe: bool = True):
 
 
 def save_manifest_from_props(context):
-    scene = context.scene
-    props = scene.manifest_tools
+    props = context.scene.manifest_tools
     if not props.manifest_path.strip():
         raise RuntimeError("Manifest Path is empty.")
 
@@ -714,30 +678,146 @@ def save_manifest_from_props(context):
     props.last_status = "Saved"
 
 
+def load_manifest_file_into_props(props: MT_ToolsProps) -> bool:
+    if not props.manifest_path.strip():
+        return False
+    path = _abspath_from_cwd(props.manifest_path)
+    if not os.path.exists(path):
+        return False
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+        props.raw_manifest_json = json.dumps(manifest, indent=2)
+        props.last_good_manifest_json = props.raw_manifest_json
+        props.last_status = "Loaded"
+        load_manifest_into_props(manifest, props)
+        return True
+    except Exception as e:
+        props.last_status = f"Auto-load FAILED: {e!r}"
+        return False
+
+
 # -----------------------------
-# CLI fill
+# Face Picking
 # -----------------------------
 
-def fill_paths_from_cli(props: MT_ToolsProps) -> bool:
-    builder_cli, manifest_cli = _parse_cli_paths()
-    changed = False
+def _get_view3d_window_region_and_rv3d(context):
+    area = context.area
+    if area is None or area.type != 'VIEW_3D':
+        return None, None
+    region_win = None
+    for r in area.regions:
+        if r.type == 'WINDOW':
+            region_win = r
+            break
+    rv3d = area.spaces.active.region_3d if area.spaces and hasattr(area.spaces.active, "region_3d") else None
+    return region_win, rv3d
 
-    if manifest_cli and not props.manifest_path.strip():
-        props.manifest_path = _abspath_from_cwd(manifest_cli)
-        changed = True
 
-    if builder_cli and not props.builder_path.strip():
-        props.builder_path = _abspath_from_cwd(builder_cli)
-        changed = True
+def _build_bvh_for_solid(solid_obj):
+    me = solid_obj.data
+    verts = [v.co.copy() for v in me.vertices]
+    polys = [tuple(p.vertices) for p in me.polygons]
+    if not polys:
+        return None
+    return BVHTree.FromPolygons(verts, polys, all_triangles=True)
 
-    # If manifest is set but builder isn't, try guessing
-    if props.manifest_path.strip() and not props.builder_path.strip():
-        guess = _guess_builder_path(_abspath_from_cwd(props.manifest_path))
-        if guess:
-            props.builder_path = guess
-            changed = True
 
-    return changed
+class MT_OT_PickLabelFace(Operator):
+    bl_idname = "mt.pick_label_face"
+    bl_label = "Pick Face"
+    bl_description = "Click a face in the viewport to attach the active label to that face"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    label_index: IntProperty(default=-1)
+
+    def invoke(self, context, event):
+        if context.area is None or context.area.type != 'VIEW_3D':
+            self.report({'ERROR'}, "Pick Face must be started from a 3D View area.")
+            return {'CANCELLED'}
+
+        props = context.scene.manifest_tools
+        if len(props.labels) == 0:
+            self.report({'ERROR'}, "No labels in UI. Load manifest or Add Label first.")
+            return {'CANCELLED'}
+
+        i = int(self.label_index if self.label_index >= 0 else props.active_label_index)
+        if i < 0 or i >= len(props.labels):
+            self.report({'ERROR'}, "No active label selected.")
+            return {'CANCELLED'}
+
+        self._label_index = i
+        lbl = props.labels[i]
+        boundary_name = lbl.target or props.boundary.name
+        solid_name = f"{boundary_name}_Solid"
+        solid_obj = bpy.data.objects.get(solid_name)
+        if solid_obj is None:
+            self.report({'ERROR'}, f"Boundary solid not found: {solid_name}. Apply once to build it.")
+            return {'CANCELLED'}
+
+        self._solid_obj = solid_obj
+        self._inv_mw = solid_obj.matrix_world.inverted()
+        self._inv_mw_3 = solid_obj.matrix_world.to_3x3().inverted()
+
+        bvh = _build_bvh_for_solid(solid_obj)
+        if bvh is None:
+            self.report({'ERROR'}, f"Boundary solid mesh has no faces: {solid_name}")
+            return {'CANCELLED'}
+        self._bvh = bvh
+
+        context.window_manager.modal_handler_add(self)
+        props.last_status = "Pick Face: Left-click a face; Esc/Right-click cancels"
+        return {'RUNNING_MODAL'}
+
+    def modal(self, context, event):
+        if event.type in {'RIGHTMOUSE', 'ESC'}:
+            context.scene.manifest_tools.last_status = "Pick Face cancelled"
+            return {'CANCELLED'}
+
+        if event.type == 'LEFTMOUSE' and event.value == 'PRESS':
+            region_win, rv3d = _get_view3d_window_region_and_rv3d(context)
+            if region_win is None or rv3d is None:
+                self.report({'ERROR'}, "Could not access View3D window region.")
+                return {'CANCELLED'}
+
+            # Convert absolute mouse coords to region coords
+            coord = (event.mouse_x - region_win.x, event.mouse_y - region_win.y)
+
+            origin = view3d_utils.region_2d_to_origin_3d(region_win, rv3d, coord)
+            direction = view3d_utils.region_2d_to_vector_3d(region_win, rv3d, coord)
+            if origin is None or direction is None:
+                self.report({'ERROR'}, "Failed to compute pick ray.")
+                return {'CANCELLED'}
+
+            origin_l = self._inv_mw @ origin
+            dir_l = (self._inv_mw_3 @ direction).normalized()
+
+            hit = self._bvh.ray_cast(origin_l, dir_l, 1.0e9)
+            if hit is None or hit[0] is None:
+                context.scene.manifest_tools.last_status = "Pick Face: no hit (click closer to the boundary)"
+                return {'RUNNING_MODAL'}
+
+            face_index = int(hit[2])
+
+            props = context.scene.manifest_tools
+            lbl = props.labels[self._label_index]
+            lbl.attach_face_index = face_index
+            props.active_label_index = self._label_index
+            props.last_status = f"Picked face {face_index} for {lbl.name}"
+
+            # Apply after pick (via timer so we don't rebuild inside modal)
+            if props.pick_face_auto_apply:
+                def _apply_later():
+                    try:
+                        apply_scene_from_props(bpy.context, safe=True)
+                    except Exception as e:
+                        bpy.context.scene.manifest_tools.last_status = f"Auto-apply after pick FAILED: {e!r}"
+                    return None
+                bpy.app.timers.register(_apply_later, first_interval=0.01)
+
+            return {'FINISHED'}
+
+        return {'RUNNING_MODAL'}
 
 
 # -----------------------------
@@ -747,7 +827,7 @@ def fill_paths_from_cli(props: MT_ToolsProps) -> bool:
 class MT_OT_UseCLIPaths(Operator):
     bl_idname = "mt.use_cli_paths"
     bl_label = "Use CLI Paths"
-    bl_description = "Fill Manifest/Builder paths from Blender command-line args (--python/-P and -- --manifest ...)"
+    bl_description = "Fill Manifest/Builder paths from command-line args"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
@@ -760,54 +840,26 @@ class MT_OT_UseCLIPaths(Operator):
 class MT_OT_LoadManifest(Operator):
     bl_idname = "mt.load_manifest"
     bl_label = "Load"
-    bl_description = "Load manifest.json into UI properties"
+    bl_description = "Load manifest.json into UI"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
         props = context.scene.manifest_tools
-
-        # if user hasn't set paths yet, try CLI fill
         fill_paths_from_cli(props)
-
-        if not props.manifest_path.strip():
-            self.report({'ERROR'}, "Manifest Path is empty.")
+        ok = load_manifest_file_into_props(props)
+        if not ok:
+            self.report({'ERROR'}, "Failed to load manifest (check Manifest Path).")
             return {'CANCELLED'}
-
-        path = _abspath_from_cwd(props.manifest_path)
-        if not os.path.exists(path):
-            self.report({'ERROR'}, f"Manifest not found: {path}")
-            return {'CANCELLED'}
-
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                manifest = json.load(f)
-            props.raw_manifest_json = json.dumps(manifest, indent=2)
-            props.last_good_manifest_json = props.raw_manifest_json
-            props.last_status = "Loaded"
-            if not props.builder_path.strip():
-                guess = _guess_builder_path(path)
-                if guess:
-                    props.builder_path = guess
-            load_manifest_into_props(manifest, props)
-        except Exception as e:
-            props.last_status = f"Load FAILED: {e!r}"
-            self.report({'ERROR'}, f"Failed to load manifest: {e!r}")
-            return {'CANCELLED'}
-
         return {'FINISHED'}
 
 
 class MT_OT_ApplyScene(Operator):
     bl_idname = "mt.apply_scene"
     bl_label = "Apply"
-    bl_description = "Rebuild scene from current UI properties (via builder script)"
+    bl_description = "Rebuild scene from UI (via builder script)"
     bl_options = {'REGISTER', 'UNDO'}
 
-    safe: BoolProperty(
-        name="Safe Apply",
-        default=True,
-        description="If Apply fails and the scene was cleared, restore the last good build.",
-    )
+    safe: BoolProperty(name="Safe Apply", default=True)
 
     def execute(self, context):
         try:
@@ -822,7 +874,7 @@ class MT_OT_ApplyScene(Operator):
 class MT_OT_SaveManifest(Operator):
     bl_idname = "mt.save_manifest"
     bl_label = "Save"
-    bl_description = "Write current UI properties back into manifest.json"
+    bl_description = "Save UI values back to manifest.json"
     bl_options = {'REGISTER'}
 
     def execute(self, context):
@@ -835,29 +887,10 @@ class MT_OT_SaveManifest(Operator):
         return {'FINISHED'}
 
 
-class MT_OT_CaptureCameraLocation(Operator):
-    bl_idname = "mt.capture_camera_location"
-    bl_label = "Capture Camera Location"
-    bl_description = "Copy current scene camera location into UI (enables explicit location)"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    def execute(self, context):
-        props = context.scene.manifest_tools
-        cam = context.scene.camera
-        if cam is None:
-            self.report({'ERROR'}, "Scene has no active camera.")
-            return {'CANCELLED'}
-
-        props.camera.use_location = True
-        props.camera.location = (cam.location.x, cam.location.y, cam.location.z)
-        props.last_status = "Captured camera location"
-        return {'FINISHED'}
-
-
 class MT_OT_AddLabel(Operator):
     bl_idname = "mt.add_label"
     bl_label = "Add Label"
-    bl_description = "Add a new label to the manifest UI"
+    bl_description = "Add a label entry to the UI"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
@@ -874,7 +907,7 @@ class MT_OT_AddLabel(Operator):
 class MT_OT_RemoveLabel(Operator):
     bl_idname = "mt.remove_label"
     bl_label = "Remove Label"
-    bl_description = "Remove selected label from UI"
+    bl_description = "Remove selected label entry"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
@@ -889,8 +922,23 @@ class MT_OT_RemoveLabel(Operator):
         return {'FINISHED'}
 
 
+class MT_OT_SetLabelAutoFace(Operator):
+    bl_idname = "mt.set_label_auto_face"
+    bl_label = "Set Auto Face"
+    bl_description = "Set Face Index to -1 (auto select a good visible face)"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        props = context.scene.manifest_tools
+        i = props.active_label_index
+        if 0 <= i < len(props.labels):
+            props.labels[i].attach_face_index = -1
+            props.last_status = f"{props.labels[i].name}: Face Index set to AUTO (-1)"
+        return {'FINISHED'}
+
+
 # -----------------------------
-# UI List + Panels
+# UI
 # -----------------------------
 
 class MT_UL_LabelList(UIList):
@@ -902,12 +950,21 @@ class MT_UL_LabelList(UIList):
             layout.label(text="")
 
 
+def _resolved_face_for_label(label_name: str) -> str:
+    obj = bpy.data.objects.get(label_name)
+    if obj is None:
+        return ""
+    try:
+        if "attach_index" in obj:
+            return str(int(obj["attach_index"]))
+    except Exception:
+        return ""
+    return ""
+
+
 def _draw_header(layout, props):
     row = layout.row(align=True)
     row.operator("mt.use_cli_paths", icon="IMPORT")
-
-    row.separator()
-
     row.operator("mt.load_manifest", icon="FILE_REFRESH")
     row.operator("mt.save_manifest", icon="FILE_TICK")
     op = row.operator("mt.apply_scene", icon="PLAY")
@@ -937,9 +994,13 @@ class MT_PT_ManifestToolsRoot(Panel):
         box.label(text="Files", icon="FILE_FOLDER")
         box.prop(props, "manifest_path")
         box.prop(props, "builder_path")
+        box.prop(props, "auto_load_manifest_on_startup")
         box.prop(props, "reload_builder_each_apply")
 
-        row = layout.row(align=True)
+        box = layout.box()
+        box.label(text="Interaction", icon="PREFERENCES")
+        box.prop(props, "pick_face_auto_apply")
+        row = box.row(align=True)
         row.prop(props, "live_update")
         row.prop(props, "live_update_delay")
 
@@ -955,9 +1016,7 @@ class MT_PT_Boundary(Panel):
 
     def draw(self, context):
         layout = self.layout
-        props = context.scene.manifest_tools
-        b = props.boundary
-
+        b = context.scene.manifest_tools.boundary
         layout.use_property_split = True
         layout.use_property_decorate = False
 
@@ -1007,20 +1066,15 @@ class MT_PT_Camera(Panel):
 
     def draw(self, context):
         layout = self.layout
-        props = context.scene.manifest_tools
-        c = props.camera
-
+        c = context.scene.manifest_tools.camera
         layout.use_property_split = True
         layout.use_property_decorate = False
 
         layout.prop(c, "lens_mm")
         layout.prop(c, "distance")
         layout.prop(c, "use_location")
-
         if c.use_location:
             layout.prop(c, "location")
-            layout.operator("mt.capture_camera_location", icon="OUTLINER_OB_CAMERA")
-
         layout.prop(c, "target_mode")
         if c.target_mode == "CUSTOM":
             layout.prop(c, "target")
@@ -1033,12 +1087,11 @@ class MT_PT_Labels(Panel):
     bl_region_type = "UI"
     bl_category = "Tool"
     bl_parent_id = "MT_PT_manifest_tools_root"
-    bl_options = {'DEFAULT_CLOSED'}
+    bl_options = set()  # keep open by default for discoverability
 
     def draw(self, context):
         layout = self.layout
         props = context.scene.manifest_tools
-
         layout.use_property_split = True
         layout.use_property_decorate = False
 
@@ -1054,7 +1107,18 @@ class MT_PT_Labels(Panel):
             layout.separator()
             layout.prop(l, "name")
             layout.prop(l, "target")
-            layout.prop(l, "attach_face_index")
+
+            # Attach controls
+            box = layout.box()
+            box.label(text="Attach")
+            box.prop(l, "attach_face_index")
+            rr = _resolved_face_for_label(l.name)
+            if rr:
+                box.label(text=f"Resolved Face (last apply): {rr}", icon="INFO")
+            row2 = box.row(align=True)
+            row2.operator("mt.set_label_auto_face", icon="RECOVER_AUTO", text="Auto")
+            op = row2.operator("mt.pick_label_face", icon="RESTRICT_SELECT_OFF", text="Pick Face")
+            op.label_index = i
 
             box = layout.box()
             box.label(text="Cylinder")
@@ -1080,8 +1144,11 @@ class MT_PT_Labels(Panel):
             box.prop(l, "image_filepath")
             box.prop(l, "image_height")
             box.prop(l, "image_alpha")
+        else:
+            layout.label(text="No labels loaded. Click Load, or Add Label.", icon="INFO")
 
 
+# Properties editor -> Scene tab (no picking button here, but shows status + paths)
 class MT_PT_ManifestToolsScene(Panel):
     bl_label = "Manifest Tools"
     bl_idname = "MT_PT_manifest_tools_scene"
@@ -1094,17 +1161,20 @@ class MT_PT_ManifestToolsScene(Panel):
         props = context.scene.manifest_tools
         layout.use_property_split = True
         layout.use_property_decorate = False
+
         _draw_header(layout, props)
 
         box = layout.box()
         box.label(text="Files", icon="FILE_FOLDER")
         box.prop(props, "manifest_path")
         box.prop(props, "builder_path")
+        box.prop(props, "auto_load_manifest_on_startup")
         box.prop(props, "reload_builder_each_apply")
+        box.prop(props, "pick_face_auto_apply")
 
 
 # -----------------------------
-# Register / Unregister
+# Register
 # -----------------------------
 
 classes = (
@@ -1117,9 +1187,10 @@ classes = (
     MT_OT_LoadManifest,
     MT_OT_SaveManifest,
     MT_OT_ApplyScene,
-    MT_OT_CaptureCameraLocation,
     MT_OT_AddLabel,
     MT_OT_RemoveLabel,
+    MT_OT_SetLabelAutoFace,
+    MT_OT_PickLabelFace,
 
     MT_UL_LabelList,
 
@@ -1132,13 +1203,15 @@ classes = (
 
 
 def _post_register_init():
-    # Fill paths for all scenes if empty.
+    # Fill paths, optionally auto-load manifest
     for scn in bpy.data.scenes:
         if not hasattr(scn, "manifest_tools"):
             continue
         props = scn.manifest_tools
         fill_paths_from_cli(props)
-    return None  # run once
+        if props.auto_load_manifest_on_startup and not props.raw_manifest_json.strip():
+            load_manifest_file_into_props(props)
+    return None
 
 
 def register():
@@ -1146,7 +1219,6 @@ def register():
         bpy.utils.register_class(c)
     bpy.types.Scene.manifest_tools = PointerProperty(type=MT_ToolsProps)
 
-    # After registration, schedule one-shot init to fill CLI paths.
     bpy.app.timers.register(_post_register_init, first_interval=0.1)
 
 
