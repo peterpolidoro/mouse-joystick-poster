@@ -1,13 +1,36 @@
 {
+  "manifest_version": 1,
+  "seed": 1337,
   "objects": [
     {
       "name": "boundary",
       "type": "boundary",
       "shape": {
-        "type": "icosahedron",
+        "type": "dodecahedron",
         "subdivisions": 0
       },
       "radius": 1.25,
+      "edges": {
+        "radius": 0.05,
+        "color": "#00FF66",
+        "alpha": 1.0
+      },
+      "vertices": {
+        "radius": 0.08,
+        "color": "#FF00FF",
+        "alpha": 1.0
+      },
+      "faces": {
+        "thickness": 0.03,
+        "color": "#00FFFF",
+        "alpha": 0.1
+      },
+      "detail": {
+        "edge_cylinder_sides": 24,
+        "vertex_sphere_segments": 32,
+        "vertex_sphere_rings": 16,
+        "edge_coplanar_dot": 0.999999
+      },
       "transform": {
         "location": [
           0.0,
@@ -24,66 +47,65 @@
           1.0,
           1.0
         ]
+      }
+    },
+    {
+      "name": "label_01",
+      "type": "label",
+      "target": "boundary",
+      "attach": {
+        "site_type": "FACE",
+        "index": null
       },
-      "edges": {
-        "radius": 0.05,
-        "color": [
-          0.0,
-          1.0,
-          0.4
-        ],
+      "auto_placement": {
+        "enabled": true,
+        "require_visible_base": true,
+        "require_tip_in_frame": true,
+        "bbox_margin_px": 40,
+        "tip_margin_px": 60,
+        "silhouette_bias": 0.25,
+        "segment_len_bias": 0.1,
+        "length_samples": 24
+      },
+      "cylinder": {
+        "radius": 0.03,
+        "length": "AUTO",
+        "length_min": 0.6,
+        "length_max": 2.8,
+        "sides": 24,
+        "base_offset": "AUTO",
+        "color": "#FFFFFF",
         "alpha": 1.0
       },
-      "vertices": {
-        "radius": 0.08,
-        "color": [
-          1.0,
-          0.0,
-          1.0
-        ],
+      "board": {
+        "gap": "AUTO"
+      },
+      "text": {
+        "value": "Icosahedron",
+        "size": 0.3,
+        "color": "#FFFFFF",
+        "alpha": 1.0,
+        "font": null,
+        "extrude": 0.0,
+        "align_x": "CENTER"
+      },
+      "image": {
+        "filepath": null,
+        "height": 0.55,
         "alpha": 1.0
       },
-      "faces": {
-        "thickness": 0.03,
-        "color": [
-          0.0,
-          1.0,
-          1.0
-        ],
-        "alpha": 0.1
-      },
-      "detail": {
-        "edge_cylinder_sides": 24,
-        "vertex_sphere_segments": 32,
-        "vertex_sphere_rings": 16
+      "layout": {
+        "image_above_text": true,
+        "spacing": 0.05,
+        "padding": 0.04
       }
     }
   ],
-  "render": {
-    "engine": "CYCLES",
-    "samples": 512,
-    "denoise": false,
-    "cycles": {
-      "adaptive_sampling": true,
-      "adaptive_threshold": 0.01,
-      "clamp_indirect": 10.0,
-      "max_bounces": 6
-    },
-    "resolution_x": 1024,
-    "resolution_y": 1024,
-    "file_format": "PNG",
-    "filepath": "output/render.png",
-    "transparent": true
-  },
   "camera": {
+    "mode": "AUTO_NON_SYMMETRIC",
     "distance": 4.8,
     "lens_mm": 50.0,
-    "roll_deg": 13.0,
-    "target": [
-      0.0,
-      0.0,
-      0.0
-    ]
+    "target": "AUTO"
   },
   "light": {
     "type": "SUN",
@@ -93,5 +115,21 @@
       -4.0,
       6.0
     ]
+  },
+  "render": {
+    "engine": "CYCLES",
+    "samples": 512,
+    "resolution_x": 1024,
+    "resolution_y": 1024,
+    "file_format": "PNG",
+    "filepath": "output/render.png",
+    "transparent": true,
+    "denoise": false,
+    "cycles": {
+      "adaptive_sampling": true,
+      "adaptive_threshold": 0.01,
+      "clamp_indirect": 10.0,
+      "max_bounces": 6
+    }
   }
 }
