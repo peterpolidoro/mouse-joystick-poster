@@ -100,6 +100,12 @@ def scene_and_root_collection():
 
 
 def clear_scene_data():
+    # Clear any in-module caches that may hold references to datablocks we are about to delete.
+    # This prevents errors like: ReferenceError('StructRNA of type Mesh has been removed')
+    try:
+        _mesh_cache.clear()
+    except Exception:
+        pass
     # Remove objects
     for obj in list(bpy.data.objects):
         bpy.data.objects.remove(obj, do_unlink=True)
@@ -303,8 +309,12 @@ _mesh_cache: Dict[str, bpy.types.Mesh] = {}
 
 def unit_plane_mesh() -> bpy.types.Mesh:
     key = "unit_plane"
-    if key in _mesh_cache and _mesh_cache[key].name in bpy.data.meshes:
-        return _mesh_cache[key]
+    if key in _mesh_cache:
+        try:
+            if _mesh_cache[key].name in bpy.data.meshes:
+                return _mesh_cache[key]
+        except ReferenceError:
+            _mesh_cache.pop(key, None)
 
     # 1x1 plane centered at origin in XY, normal +Z
     verts = [(-0.5, -0.5, 0.0), (0.5, -0.5, 0.0), (0.5, 0.5, 0.0), (-0.5, 0.5, 0.0)]
@@ -319,8 +329,12 @@ def unit_plane_mesh() -> bpy.types.Mesh:
 def unit_cylinder_mesh(sides: int, cap_ends: bool = True) -> bpy.types.Mesh:
     sides = max(3, int(sides))
     key = f"unit_cyl_{sides}_{int(cap_ends)}"
-    if key in _mesh_cache and _mesh_cache[key].name in bpy.data.meshes:
-        return _mesh_cache[key]
+    if key in _mesh_cache:
+        try:
+            if _mesh_cache[key].name in bpy.data.meshes:
+                return _mesh_cache[key]
+        except ReferenceError:
+            _mesh_cache.pop(key, None)
 
     verts: List[Tuple[float, float, float]] = []
     faces: List[Tuple[int, ...]] = []
@@ -371,8 +385,12 @@ def unit_uv_sphere_mesh(segments: int, rings: int) -> bpy.types.Mesh:
     segs = max(3, int(segments))
     rcount = max(3, int(rings))
     key = f"unit_sphere_{segs}_{rcount}"
-    if key in _mesh_cache and _mesh_cache[key].name in bpy.data.meshes:
-        return _mesh_cache[key]
+    if key in _mesh_cache:
+        try:
+            if _mesh_cache[key].name in bpy.data.meshes:
+                return _mesh_cache[key]
+        except ReferenceError:
+            _mesh_cache.pop(key, None)
 
     verts: List[Tuple[float, float, float]] = []
     faces: List[Tuple[int, int, int]] = []
@@ -1209,21 +1227,7 @@ def choose_face_and_length_for_label(
         if forced_type == "FACE" and forced_idx is not None and int(poly.index) != int(forced_idx):
             continue
 
-        tri_center_w = mw @ poly.center
-
-        # Use the face normal (not radial-to-triangle-center) so labels are perpendicular to
-        # planar faces like dodecahedron pentagons (which are triangulated in the mesh).
-        # Transform normal correctly under scale using inverse-transpose.
-        nmat = mw.to_3x3().inverted().transposed()
-        dir_w = (nmat @ poly.normal).normalized()
-        # Ensure direction points outward (away from polyhedron center)
-        if dir_w.dot(tri_center_w - center_w) < 0.0:
-            dir_w = -dir_w
-
-        # Use the orthogonal projection of the polyhedron center onto the face plane.
-        # For regular solids, this corresponds to the face center (pentagon/square/triangle).
-        dist = dir_w.dot(tri_center_w - center_w)
-        base_w = center_w + dir_w * dist
+        base_w = mw @ poly.center
 
         base_ndc, base_in = ndc_and_in_frame(scene, cam_obj, base_w)
         if not base_in:
@@ -1233,6 +1237,10 @@ def choose_face_and_length_for_label(
             if not visible_on_solid_from_camera(scene, cam_obj, solid_obj, solid_bvh, base_w):
                 continue
 
+        d = base_w - center_w
+        if d.length < 1e-9:
+            continue
+        dir_w = d.normalized()
 
         base_px, _, _ = ndc_to_px(scene, base_ndc)
         silhouette = (base_px - center_px).length
