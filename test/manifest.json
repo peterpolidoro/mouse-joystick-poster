@@ -6,7 +6,7 @@
       "name": "boundary",
       "type": "boundary",
       "shape": {
-        "type": "dodecahedron",
+        "type": "icosahedron",
         "subdivisions": 0
       },
       "radius": 1.25,
@@ -86,7 +86,7 @@
         "color": "#FFFFFF",
         "alpha": 1.0,
         "font": null,
-        "extrude": 0.0,
+        "extrude": 0.02,
         "align_x": "CENTER"
       },
       "image": {
@@ -105,7 +105,8 @@
     "mode": "AUTO_NON_SYMMETRIC",
     "distance": 4.8,
     "lens_mm": 50.0,
-    "target": "AUTO"
+    "target": "AUTO",
+    "projection": "PERSP"
   },
   "light": {
     "type": "SUN",
@@ -131,5 +132,8 @@
       "clamp_indirect": 10.0,
       "max_bounces": 6
     }
+  },
+  "labels": {
+    "plane_mode": "CAMERA"
   }
 }

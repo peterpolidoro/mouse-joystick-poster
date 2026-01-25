@@ -24,6 +24,18 @@ import bpy
 from mathutils import Matrix, Vector
 from mathutils.bvhtree import BVHTree
 from bpy_extras.object_utils import world_to_camera_view
+# ----------------------------
+# Data structs
+# ----------------------------
+
+@dataclass
+class BoundaryInfo:
+    """Information about a built boundary object (used for labels/camera auto-placement)."""
+    name: str
+    collection: bpy.types.Collection
+    root: bpy.types.Object
+    solid: bpy.types.Object
+    radius: float
 
 
 # ----------------------------
@@ -100,6 +112,12 @@ def scene_and_root_collection():
 
 
 def clear_scene_data():
+    # Clear in-module caches that may hold references to datablocks we are about to delete.
+    # This prevents errors like: ReferenceError('StructRNA of type Mesh has been removed')
+    try:
+        _mesh_cache.clear()
+    except Exception:
+        pass
     # Remove objects
     for obj in list(bpy.data.objects):
         bpy.data.objects.remove(obj, do_unlink=True)
@@ -523,8 +541,8 @@ def tetrahedron_topology(radius: float) -> Tuple[List[Vector], List[Tuple[int, i
     return verts, faces
 
 
-def cube_topology(radius: float) -> Tuple[List[Vector], List[Tuple[int, int, int]]]:
-    # cube vertices at distance sqrt(3) from origin, scale to radius
+def cube_topology(radius: float) -> Tuple[List[Vector], List[Tuple[int, ...]]]:
+    # Cube vertices at distance sqrt(3) from origin, scale to radius
     verts = [
         Vector((-1, -1, -1)),
         Vector(( 1, -1, -1)),
@@ -537,17 +555,16 @@ def cube_topology(radius: float) -> Tuple[List[Vector], List[Tuple[int, int, int
     ]
     verts = scale_to_radius(verts, radius)
 
-    # triangulated faces
-    faces = [
-        (0, 1, 2), (0, 2, 3),  # bottom
-        (4, 6, 5), (4, 7, 6),  # top
-        (0, 4, 5), (0, 5, 1),  # -Y
-        (1, 5, 6), (1, 6, 2),  # +X
-        (2, 6, 7), (2, 7, 3),  # +Y
-        (3, 7, 4), (3, 4, 0),  # -X
+    # 6 quad faces (outward winding)
+    faces: List[Tuple[int, ...]] = [
+        (0, 3, 2, 1),  # bottom (-Z)
+        (4, 5, 6, 7),  # top (+Z)
+        (0, 1, 5, 4),  # -Y
+        (3, 7, 6, 2),  # +Y
+        (1, 2, 6, 5),  # +X
+        (0, 4, 7, 3),  # -X
     ]
     return verts, faces
-
 
 def octahedron_topology(radius: float) -> Tuple[List[Vector], List[Tuple[int, int, int]]]:
     verts = [
@@ -566,33 +583,39 @@ def octahedron_topology(radius: float) -> Tuple[List[Vector], List[Tuple[int, in
     return verts, faces
 
 
-def dodecahedron_topology(radius: float) -> Tuple[List[Vector], List[Tuple[int, int, int]]]:
-    # Dual of icosahedron: vertices are face-centers of icosahedron.
+def dodecahedron_topology(radius: float) -> Tuple[List[Vector], List[Tuple[int, ...]]]:
+    """
+    Regular dodecahedron as the dual of an icosahedron.
+
+    - Vertices are (normalized) face-centers of the icosahedron (20 verts)
+    - Faces correspond to icosahedron vertices (12 pentagons)
+    """
     ico_verts, ico_faces = icosahedron_topology(radius=1.0)
 
-    # dodecahedron vertices: normalized face centers
+    # dodecahedron vertices: normalized icosa face centers
     dverts: List[Vector] = []
-    face_center_to_dvert: List[int] = []
+    face_to_dvert: List[int] = []
     for (a, b, c) in ico_faces:
         ctr = (ico_verts[a] + ico_verts[b] + ico_verts[c]) / 3.0
         if ctr.length > 1e-9:
             ctr = ctr.normalized()
-        face_center_to_dvert.append(len(dverts))
+        face_to_dvert.append(len(dverts))
         dverts.append(ctr)
 
-    # For each icosahedron vertex, gather incident faces -> pentagon
+    # For each icosahedron vertex, gather incident faces -> one pentagon face
     incident: List[List[int]] = [[] for _ in range(len(ico_verts))]
     for fi, (a, b, c) in enumerate(ico_faces):
         incident[a].append(fi)
         incident[b].append(fi)
         incident[c].append(fi)
 
-    dfaces_tris: List[Tuple[int, int, int]] = []
+    faces: List[Tuple[int, ...]] = []
 
     for vi, face_ids in enumerate(incident):
         if len(face_ids) != 5:
             continue
-        axis = ico_verts[vi].normalized()
+
+        axis = ico_verts[vi].normalized()  # outward face normal direction
 
         # choose basis on plane perpendicular to axis
         ref = Vector((1.0, 0.0, 0.0)) if abs(axis.x) < 0.9 else Vector((0.0, 1.0, 0.0))
@@ -604,62 +627,74 @@ def dodecahedron_topology(radius: float) -> Tuple[List[Vector], List[Tuple[int, 
 
         angs: List[Tuple[float, int]] = []
         for fi in face_ids:
-            dv = dverts[face_center_to_dvert[fi]]
+            dv_idx = face_to_dvert[fi]
+            dv = dverts[dv_idx]
+            # project onto plane orthogonal to axis and sort by angle
             u = dv - axis * dv.dot(axis)
             if u.length > 1e-9:
                 u.normalize()
             ang = math.atan2(u.dot(y_axis), u.dot(x_axis))
-            angs.append((ang, face_center_to_dvert[fi]))
+            angs.append((ang, dv_idx))
 
         angs.sort(key=lambda t: t[0])
         pent = [idx for _, idx in angs]
 
-        # triangulate pentagon fan
-        v0 = pent[0]
-        for k in range(1, 4):
-            dfaces_tris.append((v0, pent[k], pent[k + 1]))
+        # Ensure winding matches outward normal (axis)
+        v0, v1, v2 = dverts[pent[0]], dverts[pent[1]], dverts[pent[2]]
+        n = (v1 - v0).cross(v2 - v0)
+        if n.length > 1e-9:
+            n.normalize()
+        if n.dot(axis) < 0.0:
+            pent.reverse()
 
-    # Scale vertices to radius
+        faces.append(tuple(pent))
+
+    # Scale vertices to requested circumradius
     dverts = [v.normalized() * float(radius) for v in dverts]
-    return dverts, dfaces_tris
+    return dverts, faces
 
-
-def make_shape_topology(shape_cfg: Dict[str, Any], radius: float) -> Tuple[List[Vector], List[Tuple[int, int, int]]]:
+def make_shape_topology(shape_cfg: Dict[str, Any], radius: float) -> Tuple[List[Vector], List[Tuple[int, ...]]]:
     st = str(shape_cfg.get("type", "icosahedron")).lower()
     sub = int(shape_cfg.get("subdivisions", shape_cfg.get("subdivision", 0)) or 0)
 
     if st in {"icosahedron"}:
-        return icosahedron_topology(radius)
+        v, f = icosahedron_topology(radius)
+        return v, [tuple(face) for face in f]
     if st in {"icosphere"}:
         v, f = icosahedron_topology(radius)
         # interpret subdivisions like: 1 -> no subdiv (icosahedron), 2 -> 1 subdiv, etc.
         actual = max(0, sub - 1)
-        return subdivide_to_icosphere(v, f, radius, actual)
+        v2, f2 = subdivide_to_icosphere(v, f, radius, actual)
+        return v2, [tuple(face) for face in f2]
 
     if st in {"tetrahedron"}:
-        return tetrahedron_topology(radius)
+        v, f = tetrahedron_topology(radius)
+        return v, [tuple(face) for face in f]
     if st in {"cube"}:
         return cube_topology(radius)
     if st in {"octahedron"}:
-        return octahedron_topology(radius)
+        v, f = octahedron_topology(radius)
+        return v, [tuple(face) for face in f]
     if st in {"dodecahedron"}:
         return dodecahedron_topology(radius)
 
     # fallback
-    return icosahedron_topology(radius)
+    v, f = icosahedron_topology(radius)
+    return v, [tuple(face) for face in f]
 
+def boundary_edges_from_faces(faces: List[Tuple[int, ...]]) -> List[Tuple[int, int]]:
+    """Return unique boundary edges from a polygon face list (triangles/quads/pentagons/...).
 
-# ----------------------------
-# Boundary build
-# ----------------------------
-
-@dataclass
-class BoundaryInfo:
-    name: str
-    collection: bpy.types.Collection
-    root: bpy.types.Object
-    solid: bpy.types.Object
-    radius: float
+    This avoids interior diagonals introduced by triangulating planar n-gon faces.
+    """
+    edges = set()
+    for face in faces:
+        if len(face) < 2:
+            continue
+        for a, b in zip(face, face[1:] + face[:1]):  # type: ignore
+            i, j = (a, b) if a < b else (b, a)
+            edges.add((i, j))
+    return sorted(edges)
 
 
 def boundary_edges(verts: List[Vector], tri_faces: List[Tuple[int, int, int]], coplanar_dot: float = 0.999999) -> List[Tuple[int, int]]:
@@ -717,22 +752,80 @@ def create_mesh_object(name: str, mesh: bpy.types.Mesh, collection: bpy.types.Co
     return obj
 
 
-def build_solid_mesh(name: str, verts: List[Vector], faces: List[Tuple[int, int, int]]) -> bpy.types.Mesh:
+def build_solid_mesh(name: str, verts: List[Vector], faces: List[Tuple[int, ...]]) -> bpy.types.Mesh:
+    pv = [(v.x, v.y, v.z) for v in verts]
     m = bpy.data.meshes.new(name)
-    m.from_pydata([(v.x, v.y, v.z) for v in verts], [], faces)
+    m.from_pydata(pv, [], faces)
     m.update()
+    for p in m.polygons:
+        p.use_smooth = False
     return m
 
+def build_face_plate_mesh(name: str, verts: List[Vector], faces: List[Tuple[int, ...]], thickness: float) -> bpy.types.Mesh:
+    """Build face plates as closed prisms (no Solidify modifier).
 
-def build_face_plate_mesh(name: str, verts: List[Vector], faces: List[Tuple[int, int, int]]) -> bpy.types.Mesh:
-    # Duplicate vertices per face so Solidify creates rim walls per triangle.
+    We build *one* plate per polygon face (tri/quads/pentagons...), duplicating vertices per face.
+    This avoids interior seams that appear when triangulated faces are solidified separately.
+    The thickness is centered around the original face plane (+/- thickness/2).
+    """
+    t = float(thickness)
     pv: List[Tuple[float, float, float]] = []
-    pf: List[Tuple[int, int, int]] = []
-    for (a, b, c) in faces:
-        base = len(pv)
-        va, vb, vc = verts[a], verts[b], verts[c]
-        pv.extend([(va.x, va.y, va.z), (vb.x, vb.y, vb.z), (vc.x, vc.y, vc.z)])
-        pf.append((base, base + 1, base + 2))
+    pf: List[Tuple[int, ...]] = []
+
+    if t <= 0.0:
+        # Fallback: single-surface polygons
+        for face in faces:
+            if len(face) < 3:
+                continue
+            base = len(pv)
+            for idx in face:
+                v = verts[idx]
+                pv.append((v.x, v.y, v.z))
+            pf.append(tuple(range(base, base + len(face))))
+    else:
+        half = t * 0.5
+        for face in faces:
+            if len(face) < 3:
+                continue
+
+            face_idx = list(face)
+            vcoords = [verts[i] for i in face_idx]
+            ctr = Vector((0.0, 0.0, 0.0))
+            for v in vcoords:
+                ctr += v
+            ctr /= float(len(vcoords))
+
+            n = (vcoords[1] - vcoords[0]).cross(vcoords[2] - vcoords[0])
+            if n.length < 1e-9:
+                continue
+            n.normalize()
+
+            # Ensure outward normal for convex solids centered at origin
+            if n.dot(ctr) < 0.0:
+                face_idx.reverse()
+                vcoords = [verts[i] for i in face_idx]
+                n = -n
+
+            top_start = len(pv)
+            for v in vcoords:
+                vt = v + n * half
+                pv.append((vt.x, vt.y, vt.z))
+
+            bot_start = len(pv)
+            for v in vcoords:
+                vb = v - n * half
+                pv.append((vb.x, vb.y, vb.z))
+
+            k = len(vcoords)
+            # top face (outward)
+            pf.append(tuple(range(top_start, top_start + k)))
+            # bottom face (outward from the plate bottom)
+            pf.append(tuple(range(bot_start + k - 1, bot_start - 1, -1)))
+
+            # side walls
+            for i in range(k):
+                i2 = (i + 1) % k
+                pf.append((top_start + i, top_start + i2, bot_start + i2, bot_start + i))
 
     m = bpy.data.meshes.new(name)
     m.from_pydata(pv, [], pf)
@@ -740,7 +833,6 @@ def build_face_plate_mesh(name: str, verts: List[Vector], faces: List[Tuple[int,
     for p in m.polygons:
         p.use_smooth = False
     return m
-
 
 def apply_transform_to_root(root: bpy.types.Object, transform_cfg: Dict[str, Any]):
     loc = transform_cfg.get("location", [0.0, 0.0, 0.0])
@@ -761,10 +853,10 @@ def build_boundary_object(spec: Dict[str, Any], parent_collection: bpy.types.Col
     shape_cfg = spec.get("shape", {}) if isinstance(spec.get("shape", {}), dict) else {}
     radius = float(spec.get("radius", 1.0))
 
-    verts, tri_faces = make_shape_topology(shape_cfg, radius)
+    verts, faces = make_shape_topology(shape_cfg, radius)
 
     # --- solid mesh (hidden, for BVH + face centers)
-    solid_mesh = build_solid_mesh(f"{name}_SolidMesh", verts, tri_faces)
+    solid_mesh = build_solid_mesh(f"{name}_SolidMesh", verts, faces)
     solid_obj = create_mesh_object(f"{name}_Solid", solid_mesh, coll)
     solid_obj.hide_render = True
     solid_obj.hide_viewport = True
@@ -804,7 +896,7 @@ def build_boundary_object(spec: Dict[str, Any], parent_collection: bpy.types.Col
     cyl_mesh = unit_cylinder_mesh(edge_sides, cap_ends=True)
     z_axis = Vector((0.0, 0.0, 1.0))
 
-    for i, j in boundary_edges(verts, tri_faces, coplanar_dot=coplanar_dot):
+    for i, j in boundary_edges_from_faces(faces):
         v1, v2 = verts[i], verts[j]
         d = v2 - v1
         L = d.length
@@ -832,18 +924,9 @@ def build_boundary_object(spec: Dict[str, Any], parent_collection: bpy.types.Col
 
     # --- face plates
     if face_alpha > 0.0 and face_thickness > 0.0:
-        plates_mesh = build_face_plate_mesh(f"{name}_FacePlatesMesh", verts, tri_faces)
+        plates_mesh = build_face_plate_mesh(f"{name}_FacePlatesMesh", verts, faces, face_thickness)
         plates_obj = create_mesh_object(f"{name}_FacePlates", plates_mesh, coll)
         assign_material(plates_obj, mat_faces)
-
-        mod = plates_obj.modifiers.new(name="Solidify", type="SOLIDIFY")
-        mod.thickness = float(face_thickness)
-        mod.offset = 0.0
-        if hasattr(mod, "use_even_offset"):
-            mod.use_even_offset = True
-        if hasattr(mod, "use_rim"):
-            mod.use_rim = True
-
         parent_keep_world(plates_obj, root)
 
     # transform
@@ -903,6 +986,12 @@ def create_camera_from_manifest(cfg: Dict[str, Any], parent_collection: bpy.type
     cam_obj = bpy.data.objects.new("Camera", cam_data)
     parent_collection.objects.link(cam_obj)
     cam_data.lens = lens
+    cam_type = str(cam_cfg.get("type", cam_cfg.get("projection", "PERSP"))).upper()
+    if cam_type in {"PERSP", "ORTHO"}:
+        cam_data.type = cam_type
+    # For orthographic cameras, allow setting scale
+    if getattr(cam_data, "type", "PERSP") == "ORTHO":
+        cam_data.ortho_scale = float(cam_cfg.get("ortho_scale", cam_cfg.get("scale", 6.0)))
 
     if isinstance(loc, (list, tuple)) and len(loc) >= 3:
         cam_obj.location = (float(loc[0]), float(loc[1]), float(loc[2]))
@@ -1377,6 +1466,7 @@ def build_label_object(
     scene: bpy.types.Scene,
     parent_collection: bpy.types.Collection,
     project_root: str,
+    label_plane_mode: str = "CAMERA",
 ) -> None:
     name = str(spec.get("name", "label"))
     coll = ensure_collection(name, parent_collection)
@@ -1396,6 +1486,11 @@ def build_label_object(
         raise RuntimeError(f'Label "{name}": auto_placement disabled but no attach.index specified.')
 
     placement = choose_face_and_length_for_label(scene, cam_obj, boundary, spec)
+    # Store the resolved face index for UI/debugging
+    try:
+        root["attach_index"] = int(placement.face_index)
+    except Exception:
+        pass
 
     cyl_cfg = spec.get("cylinder", {}) if isinstance(spec.get("cylinder", {}), dict) else {}
     cyl_radius = float(cyl_cfg.get("radius", 0.03))
@@ -1435,8 +1530,36 @@ def build_label_object(
     board_center = tip_w + dir_w * gap
 
     board_root = create_empty(f"{name}_Board", coll)
-    bbR = camera_billboard_basis(cam_obj)
-    board_root.matrix_world = Matrix.Translation(board_center) @ bbR.to_4x4()
+
+    pm = str(label_plane_mode or "CAMERA").upper()
+    if pm not in {"CAMERA", "AXIS"}:
+        pm = "CAMERA"
+
+    if pm == "AXIS":
+        # Plane normal along the cylinder axis, but flip to face the camera if needed
+        normal = dir_w.normalized()
+        cam_to_board = cam_obj.matrix_world.translation - board_center
+        if normal.dot(cam_to_board) < 0.0:
+            normal = -normal
+
+        R = cam_obj.matrix_world.to_3x3()
+        cam_right = R @ Vector((1.0, 0.0, 0.0))
+        cam_up = R @ Vector((0.0, 1.0, 0.0))
+
+        right = cam_right - normal * cam_right.dot(normal)
+        if right.length < 1e-9:
+            right = cam_up - normal * cam_up.dot(normal)
+        if right.length < 1e-9:
+            tmp = Vector((1.0, 0.0, 0.0)) if abs(normal.x) < 0.9 else Vector((0.0, 1.0, 0.0))
+            right = tmp - normal * tmp.dot(normal)
+
+        right.normalize()
+        up = normal.cross(right).normalized()
+        basis = Matrix((right, up, normal)).transposed()
+    else:
+        basis = camera_billboard_basis(cam_obj)
+
+    board_root.matrix_world = Matrix.Translation(board_center) @ basis.to_4x4()
     parent_keep_world(board_root, root)
 
     layout_cfg = spec.get("layout", {}) if isinstance(spec.get("layout", {}), dict) else {}
@@ -1562,11 +1685,17 @@ def build_scene_from_manifest(manifest: Dict[str, Any], project_root: str, do_re
     create_light_from_manifest(manifest.get("light", {}), parent_collection=root_coll)
     apply_render_settings(manifest, project_root=project_root)
 
+    # Global label settings
+    labels_cfg = manifest.get("labels", {}) if isinstance(manifest.get("labels", {}), dict) else {}
+    label_plane_mode = str(labels_cfg.get("plane_mode", labels_cfg.get("plane", manifest.get("label_plane_mode", "CAMERA")))).upper()
+    if label_plane_mode not in {"CAMERA", "AXIS"}:
+        label_plane_mode = "CAMERA"
+
     for o in objects:
         if not isinstance(o, dict):
             continue
         if str(o.get("type", "")).lower() == "label":
-            build_label_object(o, boundaries, cam_obj, scene, parent_collection=root_coll, project_root=project_root)
+            build_label_object(o, boundaries, cam_obj, scene, parent_collection=root_coll, project_root=project_root, label_plane_mode=label_plane_mode)
 
     if do_render:
         try:
