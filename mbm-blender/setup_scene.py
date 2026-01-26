@@ -115,10 +115,14 @@ def _apply_style_to_spec(spec: Dict[str, Any], style: Dict[str, Any], enforce: b
     # Enforced: override selected sections wholesale, while preserving per-object content.
     preserve_text_value = None
     preserve_text_font = None
+    preserve_text_offset_x = None
+    preserve_text_offset_y = None
     preserve_image_filepath = None
     if isinstance(out.get("text"), dict):
         preserve_text_value = out["text"].get("value", None)
         preserve_text_font = out["text"].get("font", None)
+        preserve_text_offset_x = out["text"].get("offset_x", None)
+        preserve_text_offset_y = out["text"].get("offset_y", None)
     if isinstance(out.get("image"), dict):
         preserve_image_filepath = out["image"].get("filepath", None)
 
@@ -133,6 +137,11 @@ def _apply_style_to_spec(spec: Dict[str, Any], style: Dict[str, Any], enforce: b
             out["text"]["value"] = preserve_text_value
         if preserve_text_font is not None:
             out["text"]["font"] = preserve_text_font
+        # Placement tweaks should remain per-object even when global styles are enforced.
+        if preserve_text_offset_x is not None and "offset_x" not in out["text"]:
+            out["text"]["offset_x"] = preserve_text_offset_x
+        if preserve_text_offset_y is not None and "offset_y" not in out["text"]:
+            out["text"]["offset_y"] = preserve_text_offset_y
 
     # Image: preserve filepath
     if isinstance(style.get("image"), dict):
@@ -2181,6 +2190,17 @@ def build_label_object(
         bot_obj.location = (0.0, y_bot, 0.0)
 
 
+    # Apply per-text offset within the board plane (helps move text away from cylinders)
+    if text_obj is not None:
+        off_y = text_cfg.get("offset_y", 0.0)
+        try:
+            off_y = float(off_y)
+        except Exception:
+            off_y = 0.0
+        if abs(off_y) > 1.0e-9:
+            text_obj.location.y += off_y
+
+
     root["attach_site_type"] = "FACE"
     root["attach_index"] = int(placement.face_index)
     root["cylinder_length"] = float(L)
@@ -2428,6 +2448,17 @@ def build_port_object(
 
         top_obj.location = (0.0, y_top, 0.0)
         bot_obj.location = (0.0, y_bot, 0.0)
+
+
+    # Apply per-text offset within the board plane (helps move text away from cylinders)
+    if text_obj is not None:
+        off_y = text_cfg.get("offset_y", 0.0)
+        try:
+            off_y = float(off_y)
+        except Exception:
+            off_y = 0.0
+        if abs(off_y) > 1.0e-9:
+            text_obj.location.y += off_y
 
 
     root["cylinder_length"] = float(L)

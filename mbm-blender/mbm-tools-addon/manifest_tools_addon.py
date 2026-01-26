@@ -18,7 +18,7 @@
 bl_info = {
     "name": "MBM Tools (Boundary/Ports/Labels)",
     "author": "ChatGPT",
-    "version": (0, 3, 0),
+    "version": (0, 4, 0),
     "blender": (3, 6, 0),
     "location": "View3D > Sidebar > Tool ; Properties > Scene",
     "description": "Edit MBM manifest (boundary + ports + labels) in Blender, apply and save for reproducible renders.",
@@ -315,6 +315,7 @@ class MBM_LabelProps(PropertyGroup):
     cyl_alpha: FloatProperty(name="Alpha", default=1.0, min=0.0, max=1.0, update=_on_prop_update)
 
     text_value: StringProperty(name="Text", default="Label", update=_on_prop_update)
+    text_offset_y: FloatProperty(name="Text Offset Y", default=0.0, soft_min=-1.0, soft_max=1.0, description="Move text up/down in its board plane (local Y).", update=_on_prop_update)
     text_size: FloatProperty(name="Size", default=0.30, min=0.01, soft_max=2.0, update=_on_prop_update)
     text_extrude: FloatProperty(name="Extrude", default=0.02, min=0.0, soft_max=0.2, description="Text thickness (curve extrude).", update=_on_prop_update)
     text_color: FloatVectorProperty(name="Color", subtype="COLOR", size=3, default=(1.0, 1.0, 1.0), min=0.0, max=1.0, update=_on_prop_update)
@@ -360,6 +361,7 @@ class MBM_PortProps(PropertyGroup):
     arrow_radius: FloatProperty(name="Arrow Radius", default=0.07, min=0.001, soft_max=2.0, update=_on_prop_update)
 
     text_value: StringProperty(name="Text", default="Port", update=_on_prop_update)
+    text_offset_y: FloatProperty(name="Text Offset Y", default=0.0, soft_min=-1.0, soft_max=1.0, description="Move text up/down in its board plane (local Y).", update=_on_prop_update)
     text_size: FloatProperty(name="Size", default=0.30, min=0.01, soft_max=2.0, update=_on_prop_update)
     text_extrude: FloatProperty(name="Extrude", default=0.02, min=0.0, soft_max=0.2, description="Text thickness (curve extrude).", update=_on_prop_update)
     text_color: FloatVectorProperty(name="Color", subtype="COLOR", size=3, default=(1.0, 1.0, 1.0), min=0.0, max=1.0, update=_on_prop_update)
@@ -742,6 +744,7 @@ def load_manifest_into_props(manifest: dict, props: MBM_ToolsProps):
             item.text_size = float(txt.get("size", item.text_size))
             item.text_color = _parse_color_rgb(txt.get("color"), item.text_color)
             item.text_alpha = float(txt.get("alpha", item.text_alpha))
+            item.text_offset_y = float(txt.get("offset_y", item.text_offset_y))
             item.font_path = str(txt.get("font", "") or "")
             ex = txt.get("extrude", None)
             if isinstance(ex, (int, float)):
@@ -802,6 +805,7 @@ def load_manifest_into_props(manifest: dict, props: MBM_ToolsProps):
             item.text_size = float(txt.get("size", item.text_size))
             item.text_color = _parse_color_rgb(txt.get("color"), item.text_color)
             item.text_alpha = float(txt.get("alpha", item.text_alpha))
+            item.text_offset_y = float(txt.get("offset_y", item.text_offset_y))
             item.font_path = str(txt.get("font", "") or "")
             ex = txt.get("extrude", None)
             if isinstance(ex, (int, float)):
@@ -1049,6 +1053,7 @@ def update_manifest_from_props(manifest: dict, props: MBM_ToolsProps) -> dict:
         txt.clear()
         txt["value"] = str(item.text_value)
         txt["font"] = item.font_path if item.font_path.strip() else None
+        txt["offset_y"] = float(item.text_offset_y)
 
         img = l.setdefault("image", {})
         if not isinstance(img, dict):
@@ -1094,6 +1099,7 @@ def update_manifest_from_props(manifest: dict, props: MBM_ToolsProps) -> dict:
         txt.clear()
         txt["value"] = str(item.text_value)
         txt["font"] = item.font_path if item.font_path.strip() else None
+        txt["offset_y"] = float(item.text_offset_y)
 
         img = p.setdefault("image", {})
         if not isinstance(img, dict):
@@ -1272,7 +1278,7 @@ def _build_bvh_for_solid(solid_obj):
     polys = [tuple(p.vertices) for p in me.polygons]
     if not polys:
         return None
-    return BVHTree.FromPolygons(verts, polys, all_triangles=True)
+    return BVHTree.FromPolygons(verts, polys, all_triangles=False)
 
 
 def _resolved_attach_index(obj_name: str) -> str:
@@ -2353,6 +2359,7 @@ class MBM_PT_Ports(Panel):
             box = layout.box()
             box.label(text="Content")
             box.prop(p, "text_value")
+            box.prop(p, "text_offset_y")
             box.prop(p, "font_path")
             box.prop(p, "image_filepath")
         else:
@@ -2409,6 +2416,7 @@ class MBM_PT_Labels(Panel):
             box = layout.box()
             box.label(text="Content")
             box.prop(l, "text_value")
+            box.prop(l, "text_offset_y")
             box.prop(l, "font_path")
             box.prop(l, "image_filepath")
         else:

@@ -1,0 +1,23 @@
+{
+  "input": "../cad/joystick/joystick-full.glb",
+  "output": "output/image.png",
+
+  "rot": [0, 0, 25],
+  "scale": 1.0,
+
+  "size": 2.0,
+  "res": [2048, 2048],
+  "samples": 512,
+
+  "engine": "cycles",
+  "gpu": true,
+
+  "azimuth": 35,
+  "elevation": 20,
+  "fov": 50,
+
+  "shadow_catcher": true,
+
+  "hdri": null,
+  "hdri_strength": 1.0
+}
