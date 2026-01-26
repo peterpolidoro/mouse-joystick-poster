@@ -8,7 +8,7 @@ CHANNELS      := $(PROJECT_ROOT)/channels.scm
 GUIX_MANIFEST := $(PROJECT_ROOT)/manifest.scm
 
 SCENE_SCRIPT  := $(PROJECT_ROOT)/setup_scene.py
-SCENE_JSON    := $(PROJECT_ROOT)/manifest.json
+SCENE_JSON    := $(PROJECT_ROOT)/manifest-1.json
 
 # Use guix time-machine so channels.scm is respected.
 GUIX_TM       := guix time-machine -C $(CHANNELS) --

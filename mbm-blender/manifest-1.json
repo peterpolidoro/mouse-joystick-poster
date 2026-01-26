@@ -1,0 +1,304 @@
+{
+  "manifest_version": 1,
+  "seed": 1337,
+  "boards": {
+    "plane_mode": "CAMERA"
+  },
+  "styles": {
+    "enforce_global": true,
+    "global_scale": 1.0,
+    "label": {
+      "cylinder": {
+        "radius": 0.02,
+        "length": "AUTO",
+        "length_min": 0.35,
+        "length_max": 0.95,
+        "sides": 20,
+        "base_offset": "AUTO",
+        "color": "#FF7A00",
+        "alpha": 1.0
+      },
+      "board": {
+        "gap": 0.05
+      },
+      "text": {
+        "size": 0.34,
+        "extrude": 0.02,
+        "color": "#FF7A00",
+        "alpha": 1.0,
+        "align_x": "CENTER",
+        "align_y": "CENTER"
+      },
+      "image": {
+        "height": 0.4,
+        "alpha": 1.0
+      },
+      "layout": {
+        "image_above_text": true,
+        "spacing": 0.05,
+        "padding": 0.04
+      }
+    },
+    "port": {
+      "power": {
+        "cylinder": {
+          "radius": 0.03,
+          "length": "AUTO",
+          "length_min": 0.7,
+          "length_max": 2.5,
+          "sides": 24,
+          "base_offset": "AUTO",
+          "color": "#FF0000",
+          "alpha": 1.0
+        },
+        "board": {
+          "gap": 0.0
+        },
+        "arrow": {
+          "enabled": true,
+          "length": 0.18,
+          "radius": 0.07
+        },
+        "text": {
+          "size": 0.28,
+          "extrude": 0.02,
+          "color": "#FF0000",
+          "alpha": 1.0,
+          "align_x": "CENTER",
+          "align_y": "CENTER"
+        },
+        "image": {
+          "height": 0.5,
+          "alpha": 1.0
+        },
+        "layout": {
+          "image_above_text": true,
+          "spacing": 0.05,
+          "padding": 0.04
+        }
+      },
+      "info": {
+        "cylinder": {
+          "radius": 0.02,
+          "length": "AUTO",
+          "length_min": 0.6,
+          "length_max": 2.2,
+          "sides": 24,
+          "base_offset": "AUTO",
+          "color": "#00FFFF",
+          "alpha": 1.0
+        },
+        "board": {
+          "gap": 0.0
+        },
+        "arrow": {
+          "enabled": true,
+          "length": 0.16,
+          "radius": 0.06
+        },
+        "text": {
+          "size": 0.26,
+          "extrude": 0.02,
+          "color": "#00FFFF",
+          "alpha": 1.0,
+          "align_x": "CENTER",
+          "align_y": "CENTER"
+        },
+        "image": {
+          "height": 0.45,
+          "alpha": 1.0
+        },
+        "layout": {
+          "image_above_text": true,
+          "spacing": 0.05,
+          "padding": 0.04
+        }
+      }
+    }
+  },
+  "objects": [
+    {
+      "name": "boundary",
+      "type": "boundary",
+      "shape": {
+        "type": "icosahedron",
+        "subdivisions": 0
+      },
+      "radius": 1.25,
+      "edges": {
+        "radius": 0.05,
+        "color": "#333333",
+        "alpha": 1.0
+      },
+      "vertices": {
+        "radius": 0.08,
+        "color": "#39FF14",
+        "alpha": 1.0
+      },
+      "faces": {
+        "thickness": 0.03,
+        "color": "#FF00FF",
+        "alpha": 0.1
+      },
+      "detail": {
+        "edge_cylinder_sides": 24,
+        "vertex_sphere_segments": 32,
+        "vertex_sphere_rings": 16,
+        "edge_coplanar_dot": 0.999999
+      }
+    },
+    {
+      "name": "scientists",
+      "type": "label",
+      "target": "boundary",
+      "direction": "OUT",
+      "attach": {
+        "site_type": "FACE",
+        "index": null
+      },
+      "auto_placement": {
+        "enabled": true,
+        "require_visible_base": true,
+        "require_tip_in_frame": true
+      },
+      "text": {
+        "value": "Scientists",
+        "font": null,
+        "offset_y": -0.12
+      }
+    },
+    {
+      "name": "infrastructure",
+      "type": "label",
+      "target": "boundary",
+      "direction": "OUT",
+      "attach": {
+        "site_type": "FACE",
+        "index": null
+      },
+      "auto_placement": {
+        "enabled": true,
+        "require_visible_base": true,
+        "require_tip_in_frame": true
+      },
+      "text": {
+        "value": "Infrastructure",
+        "font": null,
+        "offset_y": -0.12
+      }
+    },
+    {
+      "name": "mice",
+      "type": "label",
+      "target": "boundary",
+      "direction": "OUT",
+      "attach": {
+        "site_type": "FACE",
+        "index": null
+      },
+      "auto_placement": {
+        "enabled": true,
+        "require_visible_base": true,
+        "require_tip_in_frame": true
+      },
+      "text": {
+        "value": "Mice",
+        "font": null,
+        "offset_y": -0.12
+      }
+    },
+    {
+      "name": "engineers",
+      "type": "label",
+      "target": "boundary",
+      "direction": "OUT",
+      "attach": {
+        "site_type": "FACE",
+        "index": null
+      },
+      "auto_placement": {
+        "enabled": true,
+        "require_visible_base": true,
+        "require_tip_in_frame": true
+      },
+      "text": {
+        "value": "Engineers",
+        "font": null,
+        "offset_y": -0.12
+      }
+    },
+    {
+      "name": "mechatronics",
+      "type": "label",
+      "target": "boundary",
+      "direction": "OUT",
+      "attach": {
+        "site_type": "FACE",
+        "index": null
+      },
+      "auto_placement": {
+        "enabled": true,
+        "require_visible_base": true,
+        "require_tip_in_frame": true
+      },
+      "text": {
+        "value": "Mechatronics",
+        "font": null,
+        "offset_y": -0.12
+      }
+    },
+    {
+      "name": "paper",
+      "type": "port",
+      "target": "boundary",
+      "attach": {
+        "site_type": "VERTEX",
+        "index": null
+      },
+      "flow": {
+        "kind": "INFO",
+        "direction": "OUT"
+      },
+      "auto_placement": {
+        "enabled": true,
+        "require_visible_base": true,
+        "require_tip_in_frame": true
+      },
+      "image": {
+        "filepath": "images/paper.png",
+        "scale": 6
+      }
+    }
+  ],
+  "camera": {
+    "mode": "AUTO_NON_SYMMETRIC",
+    "type": "PERSP",
+    "lens_mm": 50.0,
+    "distance": 4.8,
+    "target": "AUTO"
+  },
+  "light": {
+    "type": "SUN",
+    "rotation_deg": [
+      45,
+      0,
+      -35
+    ],
+    "energy": 3.0,
+    "color": [
+      1.0,
+      1.0,
+      1.0
+    ]
+  },
+  "render": {
+    "engine": "BLENDER_EEVEE",
+    "resolution": [
+      1600,
+      1000
+    ],
+    "transparent_background": true,
+    "output_filepath": "renders/mbm_example_v0_4_scale_images.png",
+    "file_format": "PNG"
+  }
+}
