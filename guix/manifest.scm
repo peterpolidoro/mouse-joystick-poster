@@ -2,6 +2,7 @@
  '(;; CAD / EDA / rendering
    "freecad"
    "blender"
+   "assimp"
    "kicad"
    "kicad-doc"
    "kicad-symbols"

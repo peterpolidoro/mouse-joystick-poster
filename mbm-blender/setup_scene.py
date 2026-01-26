@@ -1352,22 +1352,46 @@ def choose_vertex_and_length_for_port(
     cam_obj: bpy.types.Object,
     boundary: BoundaryInfo,
     port_spec: Dict[str, Any],
+    used_vertices: Optional[set[int]] = None,
 ) -> PortPlacement:
     """Pick a vertex (and a suitable length) for a vertex-attached port.
 
+    - If attach.index is provided (>=0), that vertex is used.
+    - If attach.index is None or <0, a vertex is auto-selected.
+    - When auto-selecting, auto_placement.unique_vertices (default True) avoids reusing
+      vertices already present in used_vertices (but will fall back to used vertices if needed).
+
     This mirrors choose_face_and_length_for_label(), but uses boundary vertices as attach sites.
     """
+
+    def _norm_index(v: Any) -> Optional[int]:
+        if v is None:
+            return None
+        try:
+            iv = int(v)
+        except Exception:
+            return None
+        return iv if iv >= 0 else None
+
+    port_name = str(port_spec.get("name", "port"))
+
     solid_obj = boundary.solid
     mesh = solid_obj.data
     mw = solid_obj.matrix_world
     center_w = mw.translation
 
     attach = port_spec.get("attach", {}) if isinstance(port_spec.get("attach", {}), dict) else {}
-    forced_idx = attach.get("index", None)
+    forced_idx = _norm_index(attach.get("index", None))
     forced_type = attach.get("site_type", "VERTEX")
     if forced_type is None:
         forced_type = "VERTEX"
     forced_type = str(forced_type).upper()
+
+    # If a forced index is out-of-range (e.g. boundary topology changed), fall back to AUTO.
+    if forced_idx is not None:
+        if forced_idx < 0 or forced_idx >= len(mesh.vertices):
+            print(f'[port] "{port_name}": attach.index={forced_idx} is out of range for boundary "{boundary.name}" (verts={len(mesh.vertices)}); using AUTO.')
+            forced_idx = None
 
     cyl_cfg = port_spec.get("cylinder", {}) if isinstance(port_spec.get("cylinder", {}), dict) else {}
     cyl_radius = float(cyl_cfg.get("radius", 0.03))
@@ -1393,6 +1417,9 @@ def choose_vertex_and_length_for_port(
     seg_bias = float(ap.get("segment_len_bias", 0.10))
     length_samples = int(ap.get("length_samples", 24))
 
+    unique_vertices = bool(ap.get("unique_vertices", ap.get("unique_vertex", True)))
+    used_set = used_vertices if (unique_vertices and used_vertices is not None and forced_idx is None) else None
+
     solid_bvh = build_solid_bvh(solid_obj)
 
     center_ndc, _ = ndc_and_in_frame(scene, cam_obj, center_w)
@@ -1400,16 +1427,25 @@ def choose_vertex_and_length_for_port(
 
     v_world = [mw @ v.co for v in mesh.vertices]
     bbox = projected_bbox_px(scene, cam_obj, v_world)
-    bbox_expanded = (bbox[0] - bbox_margin_px, bbox[1] + bbox_margin_px, bbox[2] - bbox_margin_px, bbox[3] + bbox_margin_px)
+    bbox_expanded = (
+        bbox[0] - bbox_margin_px,
+        bbox[1] + bbox_margin_px,
+        bbox[2] - bbox_margin_px,
+        bbox[3] + bbox_margin_px,
+    )
 
     mx = tip_margin_px / max(1.0, W)
     my = tip_margin_px / max(1.0, H)
 
-    best: Optional[PortPlacement] = None
-    best_score = -1e18
+    best_any: Optional[PortPlacement] = None
+    best_any_score = -1e18
+    best_unused: Optional[PortPlacement] = None
+    best_unused_score = -1e18
 
     for v in mesh.vertices:
         vi = int(v.index)
+
+        # Respect explicit selection when provided.
         if forced_type == "VERTEX" and forced_idx is not None and vi != int(forced_idx):
             continue
 
@@ -1431,51 +1467,71 @@ def choose_vertex_and_length_for_port(
             continue
         dir_w.normalize()
 
+        # Evaluate length either fixed or sampled, but keep the best score for this vertex.
+        local_best: Optional[PortPlacement] = None
+        local_best_score = -1e18
+
         if isinstance(length_cfg, (int, float)):
             L = float(length_cfg)
             tip_w = base_w + dir_w * (base_offset + L)
             tip_ndc, _tip_in = ndc_and_in_frame(scene, cam_obj, tip_w)
             if require_tip_in_frame:
                 if not (mx <= tip_ndc.x <= 1.0 - mx and my <= tip_ndc.y <= 1.0 - my and tip_ndc.z >= 0.0):
-                    continue
-            tip_px, _, _ = ndc_to_px(scene, tip_ndc)
-            outd = outside_distance_to_bbox_px(tip_px, bbox_expanded)
-            seglen = (tip_px - base_px).length
-            out_term = outd if outd >= 0.0 else outd * 1.5
-            score = out_term + silhouette_bias * silhouette + seg_bias * seglen
-            if score > best_score:
-                best_score = score
-                best = PortPlacement(vertex_index=vi, base_w=base_w, dir_w=dir_w, length=L, tip_w=tip_w)
-            continue
-
-        local_best: Optional[PortPlacement] = None
-        local_best_score = -1e18
-
-        for s in range(max(1, length_samples)):
-            t = 0.0 if length_samples <= 1 else s / (length_samples - 1)
-            L = L_min + t * (L_max - L_min)
-
-            tip_w = base_w + dir_w * (base_offset + L)
-            tip_ndc, _tip_in = ndc_and_in_frame(scene, cam_obj, tip_w)
-
-            if require_tip_in_frame:
-                if not (mx <= tip_ndc.x <= 1.0 - mx and my <= tip_ndc.y <= 1.0 - my and tip_ndc.z >= 0.0):
-                    continue
-
-            tip_px, _, _ = ndc_to_px(scene, tip_ndc)
-            outd = outside_distance_to_bbox_px(tip_px, bbox_expanded)
-            seglen = (tip_px - base_px).length
-
-            out_term = outd if outd >= 0.0 else outd * 1.5
-            score = out_term + silhouette_bias * silhouette + seg_bias * seglen
-
-            if score > local_best_score:
+                    local_best = None
+                else:
+                    tip_px, _, _ = ndc_to_px(scene, tip_ndc)
+                    outd = outside_distance_to_bbox_px(tip_px, bbox_expanded)
+                    seglen = (tip_px - base_px).length
+                    out_term = outd if outd >= 0.0 else outd * 1.5
+                    score = out_term + silhouette_bias * silhouette + seg_bias * seglen
+                    local_best_score = score
+                    local_best = PortPlacement(vertex_index=vi, base_w=base_w, dir_w=dir_w, length=L, tip_w=tip_w)
+            else:
+                tip_px, _, _ = ndc_to_px(scene, tip_ndc)
+                outd = outside_distance_to_bbox_px(tip_px, bbox_expanded)
+                seglen = (tip_px - base_px).length
+                out_term = outd if outd >= 0.0 else outd * 1.5
+                score = out_term + silhouette_bias * silhouette + seg_bias * seglen
                 local_best_score = score
                 local_best = PortPlacement(vertex_index=vi, base_w=base_w, dir_w=dir_w, length=L, tip_w=tip_w)
+        else:
+            for s in range(max(1, length_samples)):
+                t = 0.0 if length_samples <= 1 else s / (length_samples - 1)
+                L = L_min + t * (L_max - L_min)
 
-        if local_best is not None and local_best_score > best_score:
-            best_score = local_best_score
-            best = local_best
+                tip_w = base_w + dir_w * (base_offset + L)
+                tip_ndc, _tip_in = ndc_and_in_frame(scene, cam_obj, tip_w)
+
+                if require_tip_in_frame:
+                    if not (mx <= tip_ndc.x <= 1.0 - mx and my <= tip_ndc.y <= 1.0 - my and tip_ndc.z >= 0.0):
+                        continue
+
+                tip_px, _, _ = ndc_to_px(scene, tip_ndc)
+                outd = outside_distance_to_bbox_px(tip_px, bbox_expanded)
+                seglen = (tip_px - base_px).length
+
+                out_term = outd if outd >= 0.0 else outd * 1.5
+                score = out_term + silhouette_bias * silhouette + seg_bias * seglen
+
+                if score > local_best_score:
+                    local_best_score = score
+                    local_best = PortPlacement(vertex_index=vi, base_w=base_w, dir_w=dir_w, length=L, tip_w=tip_w)
+
+        if local_best is None:
+            continue
+
+        # Track best overall (used for fallback if all vertices are "used")
+        if local_best_score > best_any_score:
+            best_any_score = local_best_score
+            best_any = local_best
+
+        # Track best among unused vertices if requested
+        if used_set is None or vi not in used_set:
+            if local_best_score > best_unused_score:
+                best_unused_score = local_best_score
+                best_unused = local_best
+
+    best = best_unused if best_unused is not None else best_any
 
     if best is None:
         if not mesh.vertices:
@@ -1665,15 +1721,88 @@ def create_text_object(
     collection: bpy.types.Collection,
     mat: bpy.types.Material,
 ) -> bpy.types.Object:
+    """Create a Text object (FONT curve) for boards (labels/ports).
+
+    Fixes:
+      - Prevent the 'double drawn' look that can happen when front/back faces overlap on flat text.
+      - Make text look 3D by default via auto-extrude + optional bevel.
+    """
     curve = bpy.data.curves.new(name=f"{name}_Curve", type="FONT")
-    curve.body = str(text_cfg.get("value", ""))
-    curve.size = float(text_cfg.get("size", 0.3))
-    curve.extrude = float(text_cfg.get("extrude", 0.0))
 
+    # --- Text content ---
+    value = text_cfg.get("value", "")
+    curve.body = "" if value is None else str(value)
+
+    # --- Size ---
+    size = float(text_cfg.get("size", 0.3) or 0.3)
+    curve.size = size
+
+    # --- Extrude (3D thickness) ---
+    # Back-compat + nicer default: treat missing/"AUTO"/0 as auto-extrude.
+    extrude_raw = text_cfg.get("extrude", "AUTO")
+    extrude_val: float
+    if isinstance(extrude_raw, str) and extrude_raw.strip().upper() == "AUTO":
+        extrude_val = max(0.001, size * 0.07)
+    else:
+        try:
+            extrude_val = float(extrude_raw)
+            if extrude_val <= 1e-6:
+                extrude_val = max(0.001, size * 0.07)
+        except Exception:
+            extrude_val = max(0.001, size * 0.07)
+
+    curve.extrude = float(extrude_val)
+
+    # --- Bevel (round the edges a bit so letters catch light) ---
+    bevel_depth_raw = text_cfg.get("bevel_depth", "AUTO")
+    bevel_depth: float
+    if isinstance(bevel_depth_raw, str) and bevel_depth_raw.strip().upper() == "AUTO":
+        # Keep bevel subtle; clamp by both thickness and size.
+        bevel_depth = min(extrude_val * 0.25, size * 0.01)
+    else:
+        try:
+            bevel_depth = float(bevel_depth_raw)
+        except Exception:
+            bevel_depth = 0.0
+
+    if hasattr(curve, "bevel_depth"):
+        curve.bevel_depth = float(max(0.0, bevel_depth))
+
+    bevel_res = int(text_cfg.get("bevel_resolution", text_cfg.get("bevel_res", 2)) or 2)
+    bevel_res = max(0, min(10, bevel_res))
+    if hasattr(curve, "bevel_resolution"):
+        curve.bevel_resolution = bevel_res
+
+    if hasattr(curve, "use_fill_caps"):
+        curve.use_fill_caps = True
+
+    # --- Alignment (center origin for easier layout) ---
     align_x = str(text_cfg.get("align_x", "CENTER")).upper()
-    if hasattr(curve, "align_x") and align_x in {"LEFT", "CENTER", "RIGHT", "JUSTIFY", "FLUSH"}:
-        curve.align_x = align_x
+    if hasattr(curve, "align_x"):
+        try:
+            curve.align_x = align_x
+        except Exception:
+            pass
 
+    align_y = str(text_cfg.get("align_y", "CENTER")).upper()
+    if hasattr(curve, "align_y"):
+        try:
+            curve.align_y = align_y
+        except Exception:
+            try:
+                curve.align_y = "CENTER"
+            except Exception:
+                pass
+
+    # --- Avoid z-fighting / 'double text' when flat ---
+    if hasattr(curve, "fill_mode"):
+        try:
+            # FULL is fine when extruded; FRONT is safer if flat.
+            curve.fill_mode = "FULL" if curve.extrude > 1e-6 else "FRONT"
+        except Exception:
+            pass
+
+    # --- Optional custom font ---
     font_path = text_cfg.get("font", None)
     if isinstance(font_path, str) and font_path.strip():
         fp = font_path.strip()
@@ -1912,12 +2041,6 @@ def build_label_object(
         top_obj.location = (0.0, y_top, 0.0)
         bot_obj.location = (0.0, y_bot, 0.0)
 
-        if top[0] == "text":
-            top_obj.location.x -= float(top_obj.dimensions.x) / 2.0
-            top_obj.location.y -= float(top_obj.dimensions.y) / 2.0
-        if bottom[0] == "text":
-            bot_obj.location.x -= float(bot_obj.dimensions.x) / 2.0
-            bot_obj.location.y -= float(bot_obj.dimensions.y) / 2.0
 
     root["attach_site_type"] = "FACE"
     root["attach_index"] = int(placement.face_index)
@@ -1937,6 +2060,7 @@ def build_port_object(
     parent_collection: bpy.types.Collection,
     project_root: str,
     board_plane_mode: str = "CAMERA",
+    used_vertices: Optional[set[int]] = None,
 ) -> None:
     name = str(spec.get("name", "port"))
     coll = ensure_collection(name, parent_collection)
@@ -1955,7 +2079,13 @@ def build_port_object(
     if not enabled and attach.get("index", None) is None:
         raise RuntimeError(f'Port "{name}": auto_placement disabled but no attach.index specified.')
 
-    placement = choose_vertex_and_length_for_port(scene, cam_obj, boundary, spec)
+    used_set = used_vertices if used_vertices is not None else set()
+    placement = choose_vertex_and_length_for_port(scene, cam_obj, boundary, spec, used_vertices=used_set)
+    # Track used vertex so subsequent AUTO-selected ports don't stack on the same vertex.
+    try:
+        used_set.add(int(placement.vertex_index))
+    except Exception:
+        pass
 
     # Store the resolved vertex index for UI/debugging
     root["attach_site_type"] = "VERTEX"
@@ -2160,12 +2290,6 @@ def build_port_object(
         top_obj.location = (0.0, y_top, 0.0)
         bot_obj.location = (0.0, y_bot, 0.0)
 
-        if top[0] == "text":
-            top_obj.location.x -= float(top_obj.dimensions.x) / 2.0
-            top_obj.location.y -= float(top_obj.dimensions.y) / 2.0
-        if bottom[0] == "text":
-            bot_obj.location.x -= float(bot_obj.dimensions.x) / 2.0
-            bot_obj.location.y -= float(bot_obj.dimensions.y) / 2.0
 
     root["cylinder_length"] = float(L)
 
@@ -2206,6 +2330,9 @@ def build_scene_from_manifest(manifest: Dict[str, Any], project_root: str, do_re
     if board_plane_mode not in {"CAMERA", "AXIS"}:
         board_plane_mode = "CAMERA"
 
+    # Track vertices used by AUTO-selected ports so they don't stack on the same vertex.
+    used_port_vertices_by_boundary: Dict[str, set[int]] = {}
+
     for o in objects:
         if not isinstance(o, dict):
             continue
@@ -2213,7 +2340,18 @@ def build_scene_from_manifest(manifest: Dict[str, Any], project_root: str, do_re
         if t == "label":
             build_label_object(o, boundaries, cam_obj, scene, parent_collection=root_coll, project_root=project_root, label_plane_mode=board_plane_mode)
         elif t == "port":
-            build_port_object(o, boundaries, cam_obj, scene, parent_collection=root_coll, project_root=project_root, board_plane_mode=board_plane_mode)
+            target_name = str(o.get("target", "boundary"))
+            used_set = used_port_vertices_by_boundary.setdefault(target_name, set())
+            build_port_object(
+                o,
+                boundaries,
+                cam_obj,
+                scene,
+                parent_collection=root_coll,
+                project_root=project_root,
+                board_plane_mode=board_plane_mode,
+                used_vertices=used_set,
+            )
 
     if do_render:
         try:

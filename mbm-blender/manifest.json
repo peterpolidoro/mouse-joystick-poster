@@ -36,7 +36,7 @@
       }
     },
     {
-      "name": "scientists",
+      "name": "entity_scientists",
       "type": "label",
       "target": "boundary",
       "direction": "OUT",
@@ -62,12 +62,13 @@
         "gap": "AUTO"
       },
       "text": {
-        "value": "MCU",
+        "value": "Scientists",
         "size": 0.35,
         "color": "#FFFFFF",
         "alpha": 1.0,
-        "extrude": 0.0,
-        "align_x": "CENTER"
+        "extrude": 0.0245,
+        "align_x": "CENTER",
+        "align_y": "CENTER"
       },
       "image": {
         "filepath": null,
@@ -120,8 +121,9 @@
         "size": 0.28,
         "color": "#FFFFFF",
         "alpha": 1.0,
-        "extrude": 0.0,
-        "align_x": "CENTER"
+        "extrude": 0.0196,
+        "align_x": "CENTER",
+        "align_y": "CENTER"
       },
       "image": {
         "filepath": null,
@@ -174,8 +176,9 @@
         "size": 0.28,
         "color": "#FFFFFF",
         "alpha": 1.0,
-        "extrude": 0.0,
-        "align_x": "CENTER"
+        "extrude": 0.0196,
+        "align_x": "CENTER",
+        "align_y": "CENTER"
       },
       "image": {
         "filepath": null,
@@ -228,13 +231,14 @@
         "size": 0.26,
         "color": "#FFFFFF",
         "alpha": 1.0,
-        "extrude": 0.0,
-        "align_x": "CENTER"
+        "extrude": 0.0182,
+        "align_x": "CENTER",
+        "align_y": "CENTER"
       },
       "image": {
         "filepath": null,
         "height": 0.45,
-        "alpha": 1.0
+    "alpha": 1.0
       },
       "layout": {
         "image_above_text": true,
@@ -243,7 +247,7 @@
       }
     },
     {
-      "name": "paper",
+      "name": "port_info_out",
       "type": "port",
       "target": "boundary",
       "attach": {
@@ -282,8 +286,9 @@
         "size": 0.26,
         "color": "#FFFFFF",
         "alpha": 1.0,
-        "extrude": 0.0,
-        "align_x": "CENTER"
+        "extrude": 0.0182,
+        "align_x": "CENTER",
+        "align_y": "CENTER"
       },
       "image": {
         "filepath": null,
