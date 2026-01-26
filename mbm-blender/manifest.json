@@ -6,6 +6,7 @@
   },
   "styles": {
     "enforce_global": true,
+    "global_scale": 1.0,
     "label": {
       "cylinder": {
         "radius": 0.02,
@@ -16,6 +17,9 @@
         "base_offset": "AUTO",
         "color": "#FF7A00",
         "alpha": 1.0
+      },
+      "board": {
+        "gap": 0.05
       },
       "text": {
         "size": 0.34,
@@ -46,6 +50,9 @@
           "base_offset": "AUTO",
           "color": "#FF0000",
           "alpha": 1.0
+        },
+        "board": {
+          "gap": 0.0
         },
         "arrow": {
           "enabled": true,
@@ -80,6 +87,9 @@
           "base_offset": "AUTO",
           "color": "#00FFFF",
           "alpha": 1.0
+        },
+        "board": {
+          "gap": 0.0
         },
         "arrow": {
           "enabled": true,
@@ -153,10 +163,12 @@
       },
       "text": {
         "value": "MCU",
-        "font": null
+        "font": null,
+        "offset_y": -0.12
       },
       "image": {
-        "filepath": null
+        "filepath": "icons/mcu.png",
+        "scale": 1.15
       }
     },
     {
@@ -178,10 +190,12 @@
       },
       "text": {
         "value": "PWR IN",
-        "font": null
+        "font": null,
+        "offset_y": -0.18
       },
       "image": {
-        "filepath": null
+        "filepath": "icons/power.png",
+        "scale": 0.9
       }
     },
     {
@@ -203,10 +217,12 @@
       },
       "text": {
         "value": "PWR OUT",
-        "font": null
+        "font": null,
+        "offset_y": -0.18
       },
       "image": {
-        "filepath": null
+        "filepath": "icons/power.png",
+        "scale": 1.0
       }
     },
     {
@@ -228,10 +244,12 @@
       },
       "text": {
         "value": "INFO IN",
-        "font": null
+        "font": null,
+        "offset_y": -0.16
       },
       "image": {
-        "filepath": null
+        "filepath": "icons/info.png",
+        "scale": 0.9
       }
     },
     {
@@ -253,10 +271,12 @@
       },
       "text": {
         "value": "INFO OUT",
-        "font": null
+        "font": null,
+        "offset_y": -0.16
       },
       "image": {
-        "filepath": null
+        "filepath": "icons/info.png",
+        "scale": 1.05
       }
     }
   ],
@@ -288,7 +308,7 @@
       1000
     ],
     "transparent_background": true,
-    "output_filepath": "renders/mbm_example_palette.png",
+    "output_filepath": "renders/mbm_example_v0_4_scale_images.png",
     "file_format": "PNG"
   }
 }

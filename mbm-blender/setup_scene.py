@@ -118,6 +118,7 @@ def _apply_style_to_spec(spec: Dict[str, Any], style: Dict[str, Any], enforce: b
     preserve_text_offset_x = None
     preserve_text_offset_y = None
     preserve_image_filepath = None
+    preserve_image_scale = None
     if isinstance(out.get("text"), dict):
         preserve_text_value = out["text"].get("value", None)
         preserve_text_font = out["text"].get("font", None)
@@ -125,6 +126,7 @@ def _apply_style_to_spec(spec: Dict[str, Any], style: Dict[str, Any], enforce: b
         preserve_text_offset_y = out["text"].get("offset_y", None)
     if isinstance(out.get("image"), dict):
         preserve_image_filepath = out["image"].get("filepath", None)
+        preserve_image_scale = out["image"].get("scale", None)
 
     for section in ("cylinder", "arrow", "layout", "board"):
         if isinstance(style.get(section), dict):
@@ -148,6 +150,8 @@ def _apply_style_to_spec(spec: Dict[str, Any], style: Dict[str, Any], enforce: b
         out["image"] = copy.deepcopy(style["image"])
         if preserve_image_filepath is not None:
             out["image"]["filepath"] = preserve_image_filepath
+        if preserve_image_scale is not None and "scale" not in out["image"]:
+            out["image"]["scale"] = preserve_image_scale
 
     return out
 
@@ -155,6 +159,53 @@ def _apply_style_to_spec(spec: Dict[str, Any], style: Dict[str, Any], enforce: b
 def _get_port_kind(spec: Dict[str, Any]) -> str:
     flow_cfg = spec.get("flow", {}) if isinstance(spec.get("flow", {}), dict) else {}
     return str(flow_cfg.get("kind", spec.get("flow_kind", "POWER")) or "POWER").upper()
+
+
+def _get_global_scale(manifest: Dict[str, Any]) -> float:
+    """Return a positive global scale factor (defaults to 1.0).
+
+    Stored at manifest["styles"]["global_scale"] (preferred), with fallback to manifest["global_scale"].
+    """
+    styles_cfg = manifest.get("styles", {}) if isinstance(manifest.get("styles", {}), dict) else {}
+    gs = styles_cfg.get("global_scale", manifest.get("global_scale", 1.0))
+    try:
+        gs_f = float(gs)
+        return gs_f if gs_f > 0.0 else 1.0
+    except Exception:
+        return 1.0
+
+
+def _apply_global_scale_to_spec(spec: Dict[str, Any], s: float) -> Dict[str, Any]:
+    """Multiply all *length-like* numeric fields in a port/label spec by s."""
+    if s is None:
+        s = 1.0
+    try:
+        s = float(s)
+    except Exception:
+        s = 1.0
+    if abs(s - 1.0) < 1e-12:
+        return spec
+
+    out = copy.deepcopy(spec) if isinstance(spec, dict) else {}
+
+    def _scale(d: Any, keys: Sequence[str]):
+        if not isinstance(d, dict):
+            return
+        for k in keys:
+            if k in d and isinstance(d[k], (int, float)):
+                d[k] = float(d[k]) * s
+
+    _scale(out.get("cylinder"), ("radius", "length", "length_min", "length_max", "base_offset"))
+    _scale(out.get("arrow"), ("length", "radius", "size", "width"))
+    _scale(out.get("board"), ("gap",))
+    _scale(out.get("layout"), ("spacing", "padding"))
+    # Text + text placement offsets in the board plane
+    _scale(out.get("text"), ("size", "extrude", "bevel_depth", "offset_x", "offset_y"))
+    # Image height is base size; image.scale is a *multiplier* and should not be scaled.
+    _scale(out.get("image"), ("height",))
+
+    return out
+
 
 
 def rad(deg: float) -> float:
@@ -1034,14 +1085,14 @@ def apply_transform_to_root(root: bpy.types.Object, transform_cfg: Dict[str, Any
     root.scale = (float(sca[0]), float(sca[1]), float(sca[2]))
 
 
-def build_boundary_object(spec: Dict[str, Any], parent_collection: bpy.types.Collection) -> BoundaryInfo:
+def build_boundary_object(spec: Dict[str, Any], parent_collection: bpy.types.Collection, global_scale: float = 1.0) -> BoundaryInfo:
     name = str(spec.get("name", "boundary"))
     coll = ensure_collection(name, parent_collection)
 
     root = create_empty(name, coll)
 
     shape_cfg = spec.get("shape", {}) if isinstance(spec.get("shape", {}), dict) else {}
-    radius = float(spec.get("radius", 1.0))
+    radius = float(spec.get("radius", 1.0)) * float(global_scale)
 
     verts, faces = make_shape_topology(shape_cfg, radius)
 
@@ -1062,15 +1113,15 @@ def build_boundary_object(spec: Dict[str, Any], parent_collection: bpy.types.Col
 
     coplanar_dot = float(detail_cfg.get("edge_coplanar_dot", 0.999999))
 
-    edge_radius = float(edges_cfg.get("radius", 0.05))
+    edge_radius = float(edges_cfg.get("radius", 0.05)) * float(global_scale)
     edge_color = parse_color_rgb(edges_cfg.get("color"), default=(1.0, 1.0, 1.0))
     edge_alpha = clamp01(edges_cfg.get("alpha", 1.0))
 
-    vert_radius = float(vertices_cfg.get("radius", 0.08))
+    vert_radius = float(vertices_cfg.get("radius", 0.08)) * float(global_scale)
     vert_color = parse_color_rgb(vertices_cfg.get("color"), default=(1.0, 0.2, 0.2))
     vert_alpha = clamp01(vertices_cfg.get("alpha", 1.0))
 
-    face_thickness = float(faces_cfg.get("thickness", 0.03))
+    face_thickness = float(faces_cfg.get("thickness", 0.03)) * float(global_scale)
     face_color = parse_color_rgb(faces_cfg.get("color"), default=(0.2, 0.6, 1.0))
     face_alpha = clamp01(faces_cfg.get("alpha", 0.12))
 
@@ -1996,6 +2047,12 @@ def create_image_plane(
     assign_material(obj, mat)
 
     desired_h = float(image_cfg.get("height", 0.55))
+    img_scale = image_cfg.get("scale", 1.0)
+    try:
+        img_scale = float(img_scale)
+    except Exception:
+        img_scale = 1.0
+    desired_h *= img_scale
     w_px, h_px = img.size[0], img.size[1]
     aspect = (w_px / h_px) if h_px else 1.0
     desired_w = desired_h * aspect
@@ -2476,12 +2533,14 @@ def build_scene_from_manifest(manifest: Dict[str, Any], project_root: str, do_re
     if not isinstance(objects, list):
         raise ValueError('"objects" must be a list in manifest.json')
 
+    global_scale = _get_global_scale(manifest)
+
     boundaries: Dict[str, BoundaryInfo] = {}
     for o in objects:
         if not isinstance(o, dict):
             continue
         if str(o.get("type", "")).lower() == "boundary":
-            info = build_boundary_object(o, parent_collection=root_coll)
+            info = build_boundary_object(o, parent_collection=root_coll, global_scale=global_scale)
             boundaries[info.name] = info
 
     boundary_for_auto = boundaries.get("boundary", None) or (next(iter(boundaries.values())) if boundaries else None)
@@ -2520,6 +2579,7 @@ def build_scene_from_manifest(manifest: Dict[str, Any], project_root: str, do_re
         t = str(o.get("type", "")).lower()
         if t == "label":
             spec = _apply_style_to_spec(o, label_style, enforce_styles, is_port=False)
+            spec = _apply_global_scale_to_spec(spec, global_scale)
             build_label_object(spec, boundaries, cam_obj, scene, parent_collection=root_coll, project_root=project_root, label_plane_mode=board_plane_mode)
         elif t == "port":
             kind = _get_port_kind(o)
@@ -2533,6 +2593,7 @@ def build_scene_from_manifest(manifest: Dict[str, Any], project_root: str, do_re
                 st = port_power_style
 
             spec = _apply_style_to_spec(o, st, enforce_styles, is_port=True)
+            spec = _apply_global_scale_to_spec(spec, global_scale)
 
             target_name = str(spec.get("target", "boundary"))
             used_set = used_port_vertices_by_boundary.setdefault(target_name, set())
@@ -2562,7 +2623,7 @@ def build_scene_from_manifest(manifest: Dict[str, Any], project_root: str, do_re
 def main():
     args = parse_args()
     manifest_path = os.path.abspath(args.manifest)
-    project_root = os.getcwd()
+    project_root = os.path.dirname(manifest_path) or os.getcwd()
 
     manifest = load_manifest(manifest_path)
     build_scene_from_manifest(manifest, project_root=project_root, do_render=bool(args.render))

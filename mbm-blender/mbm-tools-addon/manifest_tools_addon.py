@@ -18,7 +18,7 @@
 bl_info = {
     "name": "MBM Tools (Boundary/Ports/Labels)",
     "author": "ChatGPT",
-    "version": (0, 4, 0),
+    "version": (0, 6, 0),
     "blender": (3, 6, 0),
     "location": "View3D > Sidebar > Tool ; Properties > Scene",
     "description": "Edit MBM manifest (boundary + ports + labels) in Blender, apply and save for reproducible renders.",
@@ -69,6 +69,18 @@ _BUILDER_CACHE = {
 
 def _clamp01(x: float) -> float:
     return max(0.0, min(1.0, float(x)))
+
+
+def _as_float(value, default: float) -> float:
+    """Parse a float from JSON-ish values (handles None and 'AUTO')."""
+    try:
+        if value is None:
+            return float(default)
+        if isinstance(value, str) and value.strip().upper() == "AUTO":
+            return float(default)
+        return float(value)
+    except Exception:
+        return float(default)
 
 
 def _rgb_to_hex(rgb):
@@ -325,6 +337,7 @@ class MBM_LabelProps(PropertyGroup):
     image_filepath: StringProperty(name="Image", subtype="FILE_PATH", default="", update=_on_prop_update)
     image_height: FloatProperty(name="Height", default=0.55, min=0.01, soft_max=5.0, update=_on_prop_update)
     image_alpha: FloatProperty(name="Alpha", default=1.0, min=0.0, max=1.0, update=_on_prop_update)
+    image_scale: FloatProperty(name="Scale", default=1.0, min=0.01, soft_max=10.0, description="Per-item image size multiplier (applied on top of global style + global scale).", update=_on_prop_update)
 
 
 class MBM_PortProps(PropertyGroup):
@@ -371,6 +384,7 @@ class MBM_PortProps(PropertyGroup):
     image_filepath: StringProperty(name="Image", subtype="FILE_PATH", default="", update=_on_prop_update)
     image_height: FloatProperty(name="Height", default=0.55, min=0.01, soft_max=5.0, update=_on_prop_update)
     image_alpha: FloatProperty(name="Alpha", default=1.0, min=0.0, max=1.0, update=_on_prop_update)
+    image_scale: FloatProperty(name="Scale", default=1.0, min=0.01, soft_max=10.0, description="Per-item image size multiplier (applied on top of global style + global scale).", update=_on_prop_update)
 
 
 
@@ -386,6 +400,7 @@ class MBM_PowerPortStyleProps(PropertyGroup):
     arrow_enabled: BoolProperty(name="Arrowheads", default=True, update=_on_prop_update)
     arrow_length: FloatProperty(name="Arrow Length", default=0.18, min=0.001, soft_max=2.0, update=_on_prop_update)
     arrow_radius: FloatProperty(name="Arrow Radius", default=0.07, min=0.001, soft_max=2.0, update=_on_prop_update)
+    board_gap: FloatProperty(name="Board Gap", default=0.08, min=0.0, soft_max=10.0, description="Distance from cylinder tip to board center. 0 = board at tip.", update=_on_prop_update)
 
     text_size: FloatProperty(name="Text Size", default=0.28, min=0.01, soft_max=2.0, update=_on_prop_update)
     text_extrude: FloatProperty(name="Text Extrude", default=0.02, min=0.0, soft_max=0.2, description="Text thickness (curve extrude).", update=_on_prop_update)
@@ -412,6 +427,7 @@ class MBM_InfoPortStyleProps(PropertyGroup):
     arrow_enabled: BoolProperty(name="Arrowheads", default=True, update=_on_prop_update)
     arrow_length: FloatProperty(name="Arrow Length", default=0.16, min=0.001, soft_max=2.0, update=_on_prop_update)
     arrow_radius: FloatProperty(name="Arrow Radius", default=0.06, min=0.001, soft_max=2.0, update=_on_prop_update)
+    board_gap: FloatProperty(name="Board Gap", default=0.08, min=0.0, soft_max=10.0, description="Distance from cylinder tip to board center. 0 = board at tip.", update=_on_prop_update)
 
     text_size: FloatProperty(name="Text Size", default=0.26, min=0.01, soft_max=2.0, update=_on_prop_update)
     text_extrude: FloatProperty(name="Text Extrude", default=0.02, min=0.0, soft_max=0.2, description="Text thickness (curve extrude).", update=_on_prop_update)
@@ -434,6 +450,7 @@ class MBM_LabelStyleProps(PropertyGroup):
     cyl_length_max: FloatProperty(name="Max Length", default=0.95, min=0.01, soft_max=20.0, update=_on_prop_update)
     cyl_color: FloatVectorProperty(name="Color", subtype="COLOR", size=3, default=(1.0, 0.478, 0.0), min=0.0, max=1.0, update=_on_prop_update)
     cyl_alpha: FloatProperty(name="Alpha", default=1.0, min=0.0, max=1.0, update=_on_prop_update)
+    board_gap: FloatProperty(name="Board Gap", default=0.08, min=0.0, soft_max=10.0, description="Distance from cylinder tip to board center. 0 = board at tip.", update=_on_prop_update)
 
     text_size: FloatProperty(name="Text Size", default=0.34, min=0.01, soft_max=2.0, update=_on_prop_update)
     text_extrude: FloatProperty(name="Text Extrude", default=0.02, min=0.0, soft_max=0.2, description="Text thickness (curve extrude).", update=_on_prop_update)
@@ -463,6 +480,8 @@ class MBM_StylesProps(PropertyGroup):
         description="If enabled, the builder overwrites per-object style fields (cylinder/text/image sizes/colors) using these global presets.",
         update=_on_prop_update,
     )
+
+    global_scale: FloatProperty(name="Global Scale", default=1.0, min=0.001, soft_max=100.0, description="One knob to scale the entire MBM diagram (boundary, ports, labels, text, images) to match other Blender objects.", update=_on_prop_update)
 
     port_power: PointerProperty(type=MBM_PowerPortStyleProps)
     port_info: PointerProperty(type=MBM_InfoPortStyleProps)
@@ -577,6 +596,7 @@ def load_manifest_into_props(manifest: dict, props: MBM_ToolsProps):
         # Global styles (optional) — this is the *one place* to adjust sizes/colors
         styles = manifest.get("styles", {}) if isinstance(manifest.get("styles", {}), dict) else {}
         props.styles.enforce_global = bool(styles.get("enforce_global", props.styles.enforce_global))
+        props.styles.global_scale = _as_float(styles.get("global_scale", props.styles.global_scale), props.styles.global_scale)
 
         # ---- Label style
         l_style = styles.get("label", {}) if isinstance(styles.get("label", {}), dict) else {}
@@ -586,6 +606,9 @@ def load_manifest_into_props(manifest: dict, props: MBM_ToolsProps):
         props.styles.label.cyl_length_max = float(l_cyl.get("length_max", props.styles.label.cyl_length_max))
         props.styles.label.cyl_color = _parse_color_rgb(l_cyl.get("color", None), default=tuple(props.styles.label.cyl_color))
         props.styles.label.cyl_alpha = float(l_cyl.get("alpha", props.styles.label.cyl_alpha))
+
+        l_board = l_style.get("board", {}) if isinstance(l_style.get("board", {}), dict) else {}
+        props.styles.label.board_gap = _as_float(l_board.get("gap", props.styles.label.board_gap), props.styles.label.board_gap)
 
         l_txt = l_style.get("text", {}) if isinstance(l_style.get("text", {}), dict) else {}
         props.styles.label.text_size = float(l_txt.get("size", props.styles.label.text_size))
@@ -618,6 +641,9 @@ def load_manifest_into_props(manifest: dict, props: MBM_ToolsProps):
             dst.arrow_enabled = bool(arrow.get("enabled", dst.arrow_enabled))
             dst.arrow_length = float(arrow.get("length", dst.arrow_length))
             dst.arrow_radius = float(arrow.get("radius", dst.arrow_radius))
+
+            board = src.get("board", {}) if isinstance(src.get("board", {}), dict) else {}
+            dst.board_gap = _as_float(board.get("gap", dst.board_gap), dst.board_gap)
 
             txt = src.get("text", {}) if isinstance(src.get("text", {}), dict) else {}
             dst.text_size = float(txt.get("size", dst.text_size))
@@ -759,6 +785,7 @@ def load_manifest_into_props(manifest: dict, props: MBM_ToolsProps):
             item.image_filepath = str(img.get("filepath", "") or "")
             item.image_height = float(img.get("height", item.image_height))
             item.image_alpha = float(img.get("alpha", item.image_alpha))
+            item.image_scale = _as_float(img.get("scale", item.image_scale), item.image_scale)
 
         props.active_label_index = 0 if len(props.labels) else -1
 
@@ -820,6 +847,7 @@ def load_manifest_into_props(manifest: dict, props: MBM_ToolsProps):
             item.image_filepath = str(img.get("filepath", "") or "")
             item.image_height = float(img.get("height", item.image_height))
             item.image_alpha = float(img.get("alpha", item.image_alpha))
+            item.image_scale = _as_float(img.get("scale", item.image_scale), item.image_scale)
 
         props.active_port_index = 0 if len(props.ports) else -1
 
@@ -849,6 +877,8 @@ def update_manifest_from_props(manifest: dict, props: MBM_ToolsProps) -> dict:
 
     styles["enforce_global"] = bool(props.styles.enforce_global)
 
+    styles["global_scale"] = float(props.styles.global_scale)
+
     # Label style
     styles["label"] = {
         "cylinder": {
@@ -861,6 +891,7 @@ def update_manifest_from_props(manifest: dict, props: MBM_ToolsProps) -> dict:
             "color": _rgb_to_hex(props.styles.label.cyl_color),
             "alpha": float(props.styles.label.cyl_alpha),
         },
+        "board": {"gap": float(props.styles.label.board_gap)},
         "text": {
             "size": float(props.styles.label.text_size),
             "extrude": float(props.styles.label.text_extrude),
@@ -897,6 +928,7 @@ def update_manifest_from_props(manifest: dict, props: MBM_ToolsProps) -> dict:
             "color": _rgb_to_hex(props.styles.port_power.cyl_color),
             "alpha": float(props.styles.port_power.cyl_alpha),
         },
+        "board": {"gap": float(props.styles.port_power.board_gap)},
         "arrow": {
             "enabled": bool(props.styles.port_power.arrow_enabled),
             "length": float(props.styles.port_power.arrow_length),
@@ -932,6 +964,7 @@ def update_manifest_from_props(manifest: dict, props: MBM_ToolsProps) -> dict:
             "color": _rgb_to_hex(props.styles.port_info.cyl_color),
             "alpha": float(props.styles.port_info.cyl_alpha),
         },
+        "board": {"gap": float(props.styles.port_info.board_gap)},
         "arrow": {
             "enabled": bool(props.styles.port_info.arrow_enabled),
             "length": float(props.styles.port_info.arrow_length),
@@ -1062,6 +1095,7 @@ def update_manifest_from_props(manifest: dict, props: MBM_ToolsProps) -> dict:
         # Keep only filepath here; size/alpha come from styles.label.image
         img.clear()
         img["filepath"] = item.image_filepath if item.image_filepath.strip() else None
+        img["scale"] = float(item.image_scale)
 
         l.setdefault("auto_placement", {"enabled": True})
         l.setdefault("board", {"gap": "AUTO"})
@@ -1108,6 +1142,7 @@ def update_manifest_from_props(manifest: dict, props: MBM_ToolsProps) -> dict:
         # Keep only filepath here; size/alpha come from styles.port.*.image
         img.clear()
         img["filepath"] = item.image_filepath if item.image_filepath.strip() else None
+        img["scale"] = float(item.image_scale)
 
         p.setdefault("auto_placement", {"enabled": True})
         p.setdefault("board", {"gap": "AUTO"})
@@ -2110,6 +2145,7 @@ class MBM_PT_Styles(Panel):
         layout.use_property_decorate = False
 
         layout.prop(st, "enforce_global")
+        layout.prop(st, "global_scale")
 
         col = layout.column(align=True)
         col.label(text="Port + Label sizes/colors are set here (not per-item).", icon="INFO")
@@ -2126,6 +2162,7 @@ class MBM_PT_Styles(Panel):
         if st.port_power.arrow_enabled:
             box.prop(st.port_power, "arrow_length")
             box.prop(st.port_power, "arrow_radius")
+        box.prop(st.port_power, "board_gap")
         box.separator()
         box.prop(st.port_power, "text_size")
         box.prop(st.port_power, "text_extrude")
@@ -2151,6 +2188,7 @@ class MBM_PT_Styles(Panel):
         if st.port_info.arrow_enabled:
             box.prop(st.port_info, "arrow_length")
             box.prop(st.port_info, "arrow_radius")
+        box.prop(st.port_info, "board_gap")
         box.separator()
         box.prop(st.port_info, "text_size")
         box.prop(st.port_info, "text_extrude")
@@ -2172,6 +2210,7 @@ class MBM_PT_Styles(Panel):
         box.prop(st.label, "cyl_length_max")
         box.prop(st.label, "cyl_color")
         box.prop(st.label, "cyl_alpha")
+        box.prop(st.label, "board_gap")
         box.separator()
         box.prop(st.label, "text_size")
         box.prop(st.label, "text_extrude")
@@ -2362,6 +2401,7 @@ class MBM_PT_Ports(Panel):
             box.prop(p, "text_offset_y")
             box.prop(p, "font_path")
             box.prop(p, "image_filepath")
+            box.prop(p, "image_scale")
         else:
             layout.label(text="No ports loaded. Click Load, or Add Port.", icon="INFO")
 
@@ -2419,6 +2459,7 @@ class MBM_PT_Labels(Panel):
             box.prop(l, "text_offset_y")
             box.prop(l, "font_path")
             box.prop(l, "image_filepath")
+            box.prop(l, "image_scale")
         else:
             layout.label(text="No labels loaded. Click Load, or Add Label.", icon="INFO")
 
