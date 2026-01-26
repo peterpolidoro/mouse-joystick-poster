@@ -18,7 +18,7 @@
 bl_info = {
     "name": "MBM Tools (Boundary/Ports/Labels)",
     "author": "ChatGPT",
-    "version": (0, 2, 0),
+    "version": (0, 3, 0),
     "blender": (3, 6, 0),
     "location": "View3D > Sidebar > Tool ; Properties > Scene",
     "description": "Edit MBM manifest (boundary + ports + labels) in Blender, apply and save for reproducible renders.",
@@ -46,6 +46,7 @@ from bpy.types import Operator, Panel, PropertyGroup, UIList
 from mathutils import Vector, Euler
 from mathutils.bvhtree import BVHTree
 from bpy_extras import view3d_utils
+from bpy_extras.object_utils import world_to_camera_view
 
 
 # -----------------------------
@@ -240,17 +241,17 @@ class MBM_BoundaryProps(PropertyGroup):
 
     # Edges
     edge_radius: FloatProperty(name="Radius", default=0.05, min=0.0001, soft_max=1.0, update=_on_prop_update)
-    edge_color: FloatVectorProperty(name="Color", subtype="COLOR", size=3, default=(0.0, 1.0, 0.4), min=0.0, max=1.0, update=_on_prop_update)
+    edge_color: FloatVectorProperty(name="Color", subtype="COLOR", size=3, default=(0.2, 0.2, 0.2), min=0.0, max=1.0, update=_on_prop_update)
     edge_alpha: FloatProperty(name="Alpha", default=1.0, min=0.0, max=1.0, update=_on_prop_update)
 
     # Vertices
     vertex_radius: FloatProperty(name="Radius", default=0.08, min=0.0001, soft_max=1.0, update=_on_prop_update)
-    vertex_color: FloatVectorProperty(name="Color", subtype="COLOR", size=3, default=(1.0, 0.0, 1.0), min=0.0, max=1.0, update=_on_prop_update)
+    vertex_color: FloatVectorProperty(name="Color", subtype="COLOR", size=3, default=(0.2235, 1.0, 0.0784), min=0.0, max=1.0, update=_on_prop_update)
     vertex_alpha: FloatProperty(name="Alpha", default=1.0, min=0.0, max=1.0, update=_on_prop_update)
 
     # Faces
     face_thickness: FloatProperty(name="Thickness", default=0.03, min=0.0, soft_max=1.0, update=_on_prop_update)
-    face_color: FloatVectorProperty(name="Color", subtype="COLOR", size=3, default=(0.0, 1.0, 1.0), min=0.0, max=1.0, update=_on_prop_update)
+    face_color: FloatVectorProperty(name="Color", subtype="COLOR", size=3, default=(1.0, 0.0, 1.0), min=0.0, max=1.0, update=_on_prop_update)
     face_alpha: FloatProperty(name="Alpha", default=0.10, min=0.0, max=1.0, update=_on_prop_update)
 
     # Details
@@ -370,6 +371,111 @@ class MBM_PortProps(PropertyGroup):
     image_alpha: FloatProperty(name="Alpha", default=1.0, min=0.0, max=1.0, update=_on_prop_update)
 
 
+
+class MBM_PowerPortStyleProps(PropertyGroup):
+    """Global style preset for POWER ports."""
+
+    cyl_radius: FloatProperty(name="Radius", default=0.03, min=0.0001, soft_max=1.0, update=_on_prop_update)
+    cyl_length_min: FloatProperty(name="Min Length", default=0.6, min=0.01, soft_max=10.0, update=_on_prop_update)
+    cyl_length_max: FloatProperty(name="Max Length", default=2.8, min=0.01, soft_max=20.0, update=_on_prop_update)
+    cyl_color: FloatVectorProperty(name="Color", subtype="COLOR", size=3, default=(1.0, 0.0, 0.0), min=0.0, max=1.0, update=_on_prop_update)
+    cyl_alpha: FloatProperty(name="Alpha", default=1.0, min=0.0, max=1.0, update=_on_prop_update)
+
+    arrow_enabled: BoolProperty(name="Arrowheads", default=True, update=_on_prop_update)
+    arrow_length: FloatProperty(name="Arrow Length", default=0.18, min=0.001, soft_max=2.0, update=_on_prop_update)
+    arrow_radius: FloatProperty(name="Arrow Radius", default=0.07, min=0.001, soft_max=2.0, update=_on_prop_update)
+
+    text_size: FloatProperty(name="Text Size", default=0.28, min=0.01, soft_max=2.0, update=_on_prop_update)
+    text_extrude: FloatProperty(name="Text Extrude", default=0.02, min=0.0, soft_max=0.2, description="Text thickness (curve extrude).", update=_on_prop_update)
+    text_color: FloatVectorProperty(name="Text Color", subtype="COLOR", size=3, default=(1.0, 0.0, 0.0), min=0.0, max=1.0, update=_on_prop_update)
+    text_alpha: FloatProperty(name="Text Alpha", default=1.0, min=0.0, max=1.0, update=_on_prop_update)
+
+    image_height: FloatProperty(name="Image Height", default=0.50, min=0.01, soft_max=5.0, update=_on_prop_update)
+    image_alpha: FloatProperty(name="Image Alpha", default=1.0, min=0.0, max=1.0, update=_on_prop_update)
+
+    layout_image_above_text: BoolProperty(name="Image Above Text", default=True, update=_on_prop_update)
+    layout_spacing: FloatProperty(name="Spacing", default=0.05, min=0.0, soft_max=1.0, update=_on_prop_update)
+    layout_padding: FloatProperty(name="Padding", default=0.04, min=0.0, soft_max=1.0, update=_on_prop_update)
+
+
+class MBM_InfoPortStyleProps(PropertyGroup):
+    """Global style preset for INFO ports."""
+
+    cyl_radius: FloatProperty(name="Radius", default=0.02, min=0.0001, soft_max=1.0, update=_on_prop_update)
+    cyl_length_min: FloatProperty(name="Min Length", default=0.6, min=0.01, soft_max=10.0, update=_on_prop_update)
+    cyl_length_max: FloatProperty(name="Max Length", default=2.2, min=0.01, soft_max=20.0, update=_on_prop_update)
+    cyl_color: FloatVectorProperty(name="Color", subtype="COLOR", size=3, default=(0.0, 1.0, 1.0), min=0.0, max=1.0, update=_on_prop_update)
+    cyl_alpha: FloatProperty(name="Alpha", default=1.0, min=0.0, max=1.0, update=_on_prop_update)
+
+    arrow_enabled: BoolProperty(name="Arrowheads", default=True, update=_on_prop_update)
+    arrow_length: FloatProperty(name="Arrow Length", default=0.16, min=0.001, soft_max=2.0, update=_on_prop_update)
+    arrow_radius: FloatProperty(name="Arrow Radius", default=0.06, min=0.001, soft_max=2.0, update=_on_prop_update)
+
+    text_size: FloatProperty(name="Text Size", default=0.26, min=0.01, soft_max=2.0, update=_on_prop_update)
+    text_extrude: FloatProperty(name="Text Extrude", default=0.02, min=0.0, soft_max=0.2, description="Text thickness (curve extrude).", update=_on_prop_update)
+    text_color: FloatVectorProperty(name="Text Color", subtype="COLOR", size=3, default=(0.0, 1.0, 1.0), min=0.0, max=1.0, update=_on_prop_update)
+    text_alpha: FloatProperty(name="Text Alpha", default=1.0, min=0.0, max=1.0, update=_on_prop_update)
+
+    image_height: FloatProperty(name="Image Height", default=0.45, min=0.01, soft_max=5.0, update=_on_prop_update)
+    image_alpha: FloatProperty(name="Image Alpha", default=1.0, min=0.0, max=1.0, update=_on_prop_update)
+
+    layout_image_above_text: BoolProperty(name="Image Above Text", default=True, update=_on_prop_update)
+    layout_spacing: FloatProperty(name="Spacing", default=0.05, min=0.0, soft_max=1.0, update=_on_prop_update)
+    layout_padding: FloatProperty(name="Padding", default=0.04, min=0.0, soft_max=1.0, update=_on_prop_update)
+
+
+class MBM_LabelStyleProps(PropertyGroup):
+    """Global style preset for labels."""
+
+    cyl_radius: FloatProperty(name="Radius", default=0.02, min=0.0001, soft_max=1.0, update=_on_prop_update)
+    cyl_length_min: FloatProperty(name="Min Length", default=0.35, min=0.01, soft_max=10.0, update=_on_prop_update)
+    cyl_length_max: FloatProperty(name="Max Length", default=0.95, min=0.01, soft_max=20.0, update=_on_prop_update)
+    cyl_color: FloatVectorProperty(name="Color", subtype="COLOR", size=3, default=(1.0, 0.478, 0.0), min=0.0, max=1.0, update=_on_prop_update)
+    cyl_alpha: FloatProperty(name="Alpha", default=1.0, min=0.0, max=1.0, update=_on_prop_update)
+
+    text_size: FloatProperty(name="Text Size", default=0.34, min=0.01, soft_max=2.0, update=_on_prop_update)
+    text_extrude: FloatProperty(name="Text Extrude", default=0.02, min=0.0, soft_max=0.2, description="Text thickness (curve extrude).", update=_on_prop_update)
+    text_color: FloatVectorProperty(name="Text Color", subtype="COLOR", size=3, default=(1.0, 0.478, 0.0), min=0.0, max=1.0, update=_on_prop_update)
+    text_alpha: FloatProperty(name="Text Alpha", default=1.0, min=0.0, max=1.0, update=_on_prop_update)
+
+    image_height: FloatProperty(name="Image Height", default=0.40, min=0.01, soft_max=5.0, update=_on_prop_update)
+    image_alpha: FloatProperty(name="Image Alpha", default=1.0, min=0.0, max=1.0, update=_on_prop_update)
+
+    layout_image_above_text: BoolProperty(name="Image Above Text", default=True, update=_on_prop_update)
+    layout_spacing: FloatProperty(name="Spacing", default=0.05, min=0.0, soft_max=1.0, update=_on_prop_update)
+    layout_padding: FloatProperty(name="Padding", default=0.04, min=0.0, soft_max=1.0, update=_on_prop_update)
+
+
+class MBM_StylesProps(PropertyGroup):
+    """Global styles written to manifest['styles'].
+
+    This is the *one place* to adjust sizes/colors for:
+      - Power ports
+      - Info ports
+      - Labels
+    """
+
+    enforce_global: BoolProperty(
+        name="Enforce Global Styles",
+        default=True,
+        description="If enabled, the builder overwrites per-object style fields (cylinder/text/image sizes/colors) using these global presets.",
+        update=_on_prop_update,
+    )
+
+    port_power: PointerProperty(type=MBM_PowerPortStyleProps)
+    port_info: PointerProperty(type=MBM_InfoPortStyleProps)
+    label: PointerProperty(type=MBM_LabelStyleProps)
+
+
+class MBM_VisibleIndexItem(PropertyGroup):
+    """An index (vertex or face) that is visible in the active camera view."""
+
+    index: IntProperty(name="Index", default=0)
+    x_px: FloatProperty(name="X (px)", default=0.0)
+    y_px: FloatProperty(name="Y (px)", default=0.0)
+    ndc_z: FloatProperty(name="Depth", default=0.0)
+
+
 class MBM_ToolsProps(PropertyGroup):
     manifest_path: StringProperty(name="Manifest Path", subtype="FILE_PATH", default="")
     builder_path: StringProperty(name="Builder Script", subtype="FILE_PATH", default="")
@@ -410,12 +516,20 @@ class MBM_ToolsProps(PropertyGroup):
 
     boundary: PointerProperty(type=MBM_BoundaryProps)
     camera: PointerProperty(type=MBM_CameraProps)
+    styles: PointerProperty(type=MBM_StylesProps)
 
     labels: CollectionProperty(type=MBM_LabelProps)
     active_label_index: IntProperty(name="Active Label", default=0)
 
     ports: CollectionProperty(type=MBM_PortProps)
     active_port_index: IntProperty(name="Active Port", default=0)
+
+    # Camera-visible indices helper (computed from boundary solid + active camera)
+    visible_vertices: CollectionProperty(type=MBM_VisibleIndexItem)
+    active_visible_vertex_index: IntProperty(name="Active Visible Vertex", default=0)
+
+    visible_faces: CollectionProperty(type=MBM_VisibleIndexItem)
+    active_visible_face_index: IntProperty(name="Active Visible Face", default=0)
 
 
 # -----------------------------
@@ -456,6 +570,70 @@ def load_manifest_into_props(manifest: dict, props: MBM_ToolsProps):
         src = boards if boards else labels_cfg
         pm = str(src.get("plane_mode", src.get("plane", manifest.get("label_plane_mode", props.board_plane_mode)))).upper()
         props.board_plane_mode = pm if pm in {"CAMERA", "AXIS"} else props.board_plane_mode
+
+
+        # Global styles (optional) — this is the *one place* to adjust sizes/colors
+        styles = manifest.get("styles", {}) if isinstance(manifest.get("styles", {}), dict) else {}
+        props.styles.enforce_global = bool(styles.get("enforce_global", props.styles.enforce_global))
+
+        # ---- Label style
+        l_style = styles.get("label", {}) if isinstance(styles.get("label", {}), dict) else {}
+        l_cyl = l_style.get("cylinder", {}) if isinstance(l_style.get("cylinder", {}), dict) else {}
+        props.styles.label.cyl_radius = float(l_cyl.get("radius", props.styles.label.cyl_radius))
+        props.styles.label.cyl_length_min = float(l_cyl.get("length_min", props.styles.label.cyl_length_min))
+        props.styles.label.cyl_length_max = float(l_cyl.get("length_max", props.styles.label.cyl_length_max))
+        props.styles.label.cyl_color = _parse_color_rgb(l_cyl.get("color", None), default=tuple(props.styles.label.cyl_color))
+        props.styles.label.cyl_alpha = float(l_cyl.get("alpha", props.styles.label.cyl_alpha))
+
+        l_txt = l_style.get("text", {}) if isinstance(l_style.get("text", {}), dict) else {}
+        props.styles.label.text_size = float(l_txt.get("size", props.styles.label.text_size))
+        props.styles.label.text_extrude = float(l_txt.get("extrude", props.styles.label.text_extrude))
+        props.styles.label.text_color = _parse_color_rgb(l_txt.get("color", None), default=tuple(props.styles.label.text_color))
+        props.styles.label.text_alpha = float(l_txt.get("alpha", props.styles.label.text_alpha))
+
+        l_img = l_style.get("image", {}) if isinstance(l_style.get("image", {}), dict) else {}
+        props.styles.label.image_height = float(l_img.get("height", props.styles.label.image_height))
+        props.styles.label.image_alpha = float(l_img.get("alpha", props.styles.label.image_alpha))
+
+        l_layout = l_style.get("layout", {}) if isinstance(l_style.get("layout", {}), dict) else {}
+        props.styles.label.layout_image_above_text = bool(l_layout.get("image_above_text", props.styles.label.layout_image_above_text))
+        props.styles.label.layout_spacing = float(l_layout.get("spacing", props.styles.label.layout_spacing))
+        props.styles.label.layout_padding = float(l_layout.get("padding", props.styles.label.layout_padding))
+
+        # ---- Port styles
+        p_style = styles.get("port", {}) if isinstance(styles.get("port", {}), dict) else {}
+
+        def _apply_port_style(dst, src):
+            src = src if isinstance(src, dict) else {}
+            cyl = src.get("cylinder", {}) if isinstance(src.get("cylinder", {}), dict) else {}
+            dst.cyl_radius = float(cyl.get("radius", dst.cyl_radius))
+            dst.cyl_length_min = float(cyl.get("length_min", dst.cyl_length_min))
+            dst.cyl_length_max = float(cyl.get("length_max", dst.cyl_length_max))
+            dst.cyl_color = _parse_color_rgb(cyl.get("color", None), default=tuple(dst.cyl_color))
+            dst.cyl_alpha = float(cyl.get("alpha", dst.cyl_alpha))
+
+            arrow = src.get("arrow", {}) if isinstance(src.get("arrow", {}), dict) else {}
+            dst.arrow_enabled = bool(arrow.get("enabled", dst.arrow_enabled))
+            dst.arrow_length = float(arrow.get("length", dst.arrow_length))
+            dst.arrow_radius = float(arrow.get("radius", dst.arrow_radius))
+
+            txt = src.get("text", {}) if isinstance(src.get("text", {}), dict) else {}
+            dst.text_size = float(txt.get("size", dst.text_size))
+            dst.text_extrude = float(txt.get("extrude", dst.text_extrude))
+            dst.text_color = _parse_color_rgb(txt.get("color", None), default=tuple(dst.text_color))
+            dst.text_alpha = float(txt.get("alpha", dst.text_alpha))
+
+            img = src.get("image", {}) if isinstance(src.get("image", {}), dict) else {}
+            dst.image_height = float(img.get("height", dst.image_height))
+            dst.image_alpha = float(img.get("alpha", dst.image_alpha))
+
+            layout = src.get("layout", {}) if isinstance(src.get("layout", {}), dict) else {}
+            dst.layout_image_above_text = bool(layout.get("image_above_text", dst.layout_image_above_text))
+            dst.layout_spacing = float(layout.get("spacing", dst.layout_spacing))
+            dst.layout_padding = float(layout.get("padding", dst.layout_padding))
+
+        _apply_port_style(props.styles.port_power, p_style.get("power", {}))
+        _apply_port_style(props.styles.port_info, p_style.get("info", {}))
 
         # Boundary: first boundary object
         b_list = _find_objects(manifest, "boundary")
@@ -658,6 +836,123 @@ def update_manifest_from_props(manifest: dict, props: MBM_ToolsProps) -> dict:
     if isinstance(labels_cfg, dict):
         labels_cfg["plane_mode"] = str(props.board_plane_mode)
 
+
+    # Global styles (ports + labels)
+    styles = manifest.setdefault("styles", {})
+    if not isinstance(styles, dict):
+        manifest["styles"] = {}
+        styles = manifest["styles"]
+
+    styles["enforce_global"] = bool(props.styles.enforce_global)
+
+    # Label style
+    styles["label"] = {
+        "cylinder": {
+            "radius": float(props.styles.label.cyl_radius),
+            "length": "AUTO",
+            "length_min": float(props.styles.label.cyl_length_min),
+            "length_max": float(props.styles.label.cyl_length_max),
+            "sides": 20,
+            "base_offset": "AUTO",
+            "color": _rgb_to_hex(props.styles.label.cyl_color),
+            "alpha": float(props.styles.label.cyl_alpha),
+        },
+        "text": {
+            "size": float(props.styles.label.text_size),
+            "extrude": float(props.styles.label.text_extrude),
+            "color": _rgb_to_hex(props.styles.label.text_color),
+            "alpha": float(props.styles.label.text_alpha),
+            "align_x": "CENTER",
+            "align_y": "CENTER",
+        },
+        "image": {
+            "height": float(props.styles.label.image_height),
+            "alpha": float(props.styles.label.image_alpha),
+        },
+        "layout": {
+            "image_above_text": bool(props.styles.label.layout_image_above_text),
+            "spacing": float(props.styles.label.layout_spacing),
+            "padding": float(props.styles.label.layout_padding),
+        },
+    }
+
+    # Port styles
+    port_styles = styles.setdefault("port", {})
+    if not isinstance(port_styles, dict):
+        styles["port"] = {}
+        port_styles = styles["port"]
+
+    port_styles["power"] = {
+        "cylinder": {
+            "radius": float(props.styles.port_power.cyl_radius),
+            "length": "AUTO",
+            "length_min": float(props.styles.port_power.cyl_length_min),
+            "length_max": float(props.styles.port_power.cyl_length_max),
+            "sides": 24,
+            "base_offset": "AUTO",
+            "color": _rgb_to_hex(props.styles.port_power.cyl_color),
+            "alpha": float(props.styles.port_power.cyl_alpha),
+        },
+        "arrow": {
+            "enabled": bool(props.styles.port_power.arrow_enabled),
+            "length": float(props.styles.port_power.arrow_length),
+            "radius": float(props.styles.port_power.arrow_radius),
+        },
+        "text": {
+            "size": float(props.styles.port_power.text_size),
+            "extrude": float(props.styles.port_power.text_extrude),
+            "color": _rgb_to_hex(props.styles.port_power.text_color),
+            "alpha": float(props.styles.port_power.text_alpha),
+            "align_x": "CENTER",
+            "align_y": "CENTER",
+        },
+        "image": {
+            "height": float(props.styles.port_power.image_height),
+            "alpha": float(props.styles.port_power.image_alpha),
+        },
+        "layout": {
+            "image_above_text": bool(props.styles.port_power.layout_image_above_text),
+            "spacing": float(props.styles.port_power.layout_spacing),
+            "padding": float(props.styles.port_power.layout_padding),
+        },
+    }
+
+    port_styles["info"] = {
+        "cylinder": {
+            "radius": float(props.styles.port_info.cyl_radius),
+            "length": "AUTO",
+            "length_min": float(props.styles.port_info.cyl_length_min),
+            "length_max": float(props.styles.port_info.cyl_length_max),
+            "sides": 24,
+            "base_offset": "AUTO",
+            "color": _rgb_to_hex(props.styles.port_info.cyl_color),
+            "alpha": float(props.styles.port_info.cyl_alpha),
+        },
+        "arrow": {
+            "enabled": bool(props.styles.port_info.arrow_enabled),
+            "length": float(props.styles.port_info.arrow_length),
+            "radius": float(props.styles.port_info.arrow_radius),
+        },
+        "text": {
+            "size": float(props.styles.port_info.text_size),
+            "extrude": float(props.styles.port_info.text_extrude),
+            "color": _rgb_to_hex(props.styles.port_info.text_color),
+            "alpha": float(props.styles.port_info.text_alpha),
+            "align_x": "CENTER",
+            "align_y": "CENTER",
+        },
+        "image": {
+            "height": float(props.styles.port_info.image_height),
+            "alpha": float(props.styles.port_info.image_alpha),
+        },
+        "layout": {
+            "image_above_text": bool(props.styles.port_info.layout_image_above_text),
+            "spacing": float(props.styles.port_info.layout_spacing),
+            "padding": float(props.styles.port_info.layout_padding),
+        },
+    }
+
+
     # Boundary
     b = _ensure_object(manifest, props.boundary.name, "boundary")
     b["radius"] = float(props.boundary.radius)
@@ -742,41 +1037,26 @@ def update_manifest_from_props(manifest: dict, props: MBM_ToolsProps) -> dict:
 
         l["direction"] = str(item.direction)
 
-        cyl = l.setdefault("cylinder", {})
-        if not isinstance(cyl, dict):
-            l["cylinder"] = {}
-            cyl = l["cylinder"]
-        cyl["radius"] = float(item.cyl_radius)
-        cyl["color"] = _rgb_to_hex(item.cyl_color)
-        cyl["alpha"] = float(item.cyl_alpha)
-        cyl.setdefault("sides", 24)
-        if item.cyl_length_mode == "FIXED":
-            cyl["length"] = float(item.cyl_length)
-        else:
-            cyl["length"] = "AUTO"
-        cyl["length_min"] = float(item.cyl_length_min)
-        cyl["length_max"] = float(item.cyl_length_max)
+        # Per-label style is global (manifest['styles']['label']). Keep only per-label content here.
+        l.pop("cylinder", None)
+        l.pop("layout", None)
 
         txt = l.setdefault("text", {})
         if not isinstance(txt, dict):
             l["text"] = {}
             txt = l["text"]
+        # Keep only value/font here; sizes/colors come from styles.label.text
+        txt.clear()
         txt["value"] = str(item.text_value)
-        txt["size"] = float(item.text_size)
-        txt["color"] = _rgb_to_hex(item.text_color)
-        txt["alpha"] = float(item.text_alpha)
         txt["font"] = item.font_path if item.font_path.strip() else None
-        txt["extrude"] = float(item.text_extrude)
-        txt.setdefault("align_x", "CENTER")
-        txt.setdefault("align_y", "CENTER")
 
         img = l.setdefault("image", {})
         if not isinstance(img, dict):
             l["image"] = {}
             img = l["image"]
+        # Keep only filepath here; size/alpha come from styles.label.image
+        img.clear()
         img["filepath"] = item.image_filepath if item.image_filepath.strip() else None
-        img["height"] = float(item.image_height)
-        img["alpha"] = float(item.image_alpha)
 
         l.setdefault("auto_placement", {"enabled": True})
         l.setdefault("board", {"gap": "AUTO"})
@@ -801,49 +1081,27 @@ def update_manifest_from_props(manifest: dict, props: MBM_ToolsProps) -> dict:
         flow["kind"] = str(item.flow_kind)
         flow["direction"] = str(item.flow_direction)
 
-        cyl = p.setdefault("cylinder", {})
-        if not isinstance(cyl, dict):
-            p["cylinder"] = {}
-            cyl = p["cylinder"]
-        cyl["radius"] = float(item.cyl_radius)
-        cyl["color"] = _rgb_to_hex(item.cyl_color)
-        cyl["alpha"] = float(item.cyl_alpha)
-        cyl.setdefault("sides", 24)
-        if item.cyl_length_mode == "FIXED":
-            cyl["length"] = float(item.cyl_length)
-        else:
-            cyl["length"] = "AUTO"
-        cyl["length_min"] = float(item.cyl_length_min)
-        cyl["length_max"] = float(item.cyl_length_max)
-
-        arrow = p.setdefault("arrow", {})
-        if not isinstance(arrow, dict):
-            p["arrow"] = {}
-            arrow = p["arrow"]
-        arrow["enabled"] = bool(item.arrow_enabled)
-        arrow["length"] = float(item.arrow_length)
-        arrow["radius"] = float(item.arrow_radius)
+        # Per-port style is global (manifest['styles']['port']). Keep only per-port content here.
+        p.pop("cylinder", None)
+        p.pop("arrow", None)
+        p.pop("layout", None)
 
         txt = p.setdefault("text", {})
         if not isinstance(txt, dict):
             p["text"] = {}
             txt = p["text"]
+        # Keep only value/font here; sizes/colors come from styles.port.*.text
+        txt.clear()
         txt["value"] = str(item.text_value)
-        txt["size"] = float(item.text_size)
-        txt["color"] = _rgb_to_hex(item.text_color)
-        txt["alpha"] = float(item.text_alpha)
         txt["font"] = item.font_path if item.font_path.strip() else None
-        txt["extrude"] = float(item.text_extrude)
-        txt.setdefault("align_x", "CENTER")
-        txt.setdefault("align_y", "CENTER")
 
         img = p.setdefault("image", {})
         if not isinstance(img, dict):
             p["image"] = {}
             img = p["image"]
+        # Keep only filepath here; size/alpha come from styles.port.*.image
+        img.clear()
         img["filepath"] = item.image_filepath if item.image_filepath.strip() else None
-        img["height"] = float(item.image_height)
-        img["alpha"] = float(item.image_alpha)
 
         p.setdefault("auto_placement", {"enabled": True})
         p.setdefault("board", {"gap": "AUTO"})
@@ -1513,6 +1771,196 @@ class MBM_OT_PickPortVertex(Operator):
         return {'RUNNING_MODAL'}
 
 
+
+# -----------------------------
+# Visibility helper ops (list camera-visible vertex/face indices)
+# -----------------------------
+
+class MBM_OT_RefreshVisibleIndices(Operator):
+    bl_idname = "mbm.refresh_visible_indices"
+    bl_label = "Refresh Visible Indices"
+    bl_description = "Compute which boundary vertices/faces are visible in the active camera image"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        props = context.scene.mbm_tools
+        scene = context.scene
+
+        cam = scene.camera
+        if cam is None or cam.type != 'CAMERA':
+            self.report({'ERROR'}, "No active scene camera set (Scene Properties > Camera).")
+            return {'CANCELLED'}
+
+        boundary_name = props.boundary.name or "boundary"
+        solid_name = f"{boundary_name}_Solid"
+        solid_obj = bpy.data.objects.get(solid_name)
+        if solid_obj is None:
+            self.report({'ERROR'}, f"Boundary solid not found: {solid_name}. Click Apply once to build it.")
+            return {'CANCELLED'}
+
+        bvh = _build_bvh_for_solid(solid_obj)
+        if bvh is None:
+            self.report({'ERROR'}, f"Boundary solid has no faces: {solid_name}")
+            return {'CANCELLED'}
+
+        # Clear previous results
+        props.visible_vertices.clear()
+        props.visible_faces.clear()
+
+        render = scene.render
+        W = int(render.resolution_x * render.resolution_percentage / 100)
+        H = int(render.resolution_y * render.resolution_percentage / 100)
+
+        mw = solid_obj.matrix_world
+        inv = mw.inverted()
+        cam_w = cam.matrix_world.translation
+        cam_l = inv @ cam_w
+
+        me = solid_obj.data
+
+        # Epsilon for the "ray hits the vertex" check.
+        eps = max(0.01, float(props.boundary.vertex_radius) * 0.75)
+
+        vis_verts = []
+        for v in me.vertices:
+            w = mw @ v.co
+            ndc = world_to_camera_view(scene, cam, w)
+            if ndc.z < 0.0:
+                continue
+            if not (0.0 <= ndc.x <= 1.0 and 0.0 <= ndc.y <= 1.0):
+                continue
+
+            dir_l = v.co - cam_l
+            dist = dir_l.length
+            if dist < 1e-9:
+                continue
+            dir_l.normalize()
+
+            hit = bvh.ray_cast(cam_l, dir_l, dist + 1.0e-6)
+            if hit is None or hit[0] is None:
+                continue
+
+            # Visible if the first hit along the ray is at (or very near) the vertex.
+            if (hit[0] - v.co).length <= eps:
+                vis_verts.append((int(v.index), float(ndc.x) * W, float(ndc.y) * H, float(ndc.z)))
+
+        vis_verts.sort(key=lambda t: t[0])
+        for idx, x, y, z in vis_verts:
+            it = props.visible_vertices.add()
+            it.index = int(idx)
+            it.x_px = float(x)
+            it.y_px = float(y)
+            it.ndc_z = float(z)
+
+        vis_faces = []
+        for p in me.polygons:
+            c_l = p.center
+            c_w = mw @ c_l
+            ndc = world_to_camera_view(scene, cam, c_w)
+            if ndc.z < 0.0:
+                continue
+            if not (0.0 <= ndc.x <= 1.0 and 0.0 <= ndc.y <= 1.0):
+                continue
+
+            dir_l = c_l - cam_l
+            dist = dir_l.length
+            if dist < 1e-9:
+                continue
+            dir_l.normalize()
+
+            hit = bvh.ray_cast(cam_l, dir_l, dist + 1.0e-6)
+            if hit is None or hit[0] is None:
+                continue
+            face_i = int(hit[2])
+
+            # A face is considered visible if the first hit to its center is that face.
+            if face_i == int(p.index):
+                vis_faces.append((int(p.index), float(ndc.x) * W, float(ndc.y) * H, float(ndc.z)))
+
+        vis_faces.sort(key=lambda t: t[0])
+        for idx, x, y, z in vis_faces:
+            it = props.visible_faces.add()
+            it.index = int(idx)
+            it.x_px = float(x)
+            it.y_px = float(y)
+            it.ndc_z = float(z)
+
+        props.active_visible_vertex_index = 0
+        props.active_visible_face_index = 0
+        props.last_status = f"Visible indices refreshed: {len(vis_verts)} verts, {len(vis_faces)} faces"
+        return {'FINISHED'}
+
+
+class MBM_OT_UseVisibleVertexForActivePort(Operator):
+    bl_idname = "mbm.use_visible_vertex_for_port"
+    bl_label = "Use Selected Visible Vertex"
+    bl_description = "Set the active port's Vertex Index to the selected visible vertex"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        props = context.scene.mbm_tools
+        if len(props.visible_vertices) == 0:
+            self.report({'ERROR'}, "No visible vertices listed. Click Refresh Visible Indices first.")
+            return {'CANCELLED'}
+        if not (0 <= props.active_visible_vertex_index < len(props.visible_vertices)):
+            self.report({'ERROR'}, "No visible vertex selected.")
+            return {'CANCELLED'}
+        if not (0 <= props.active_port_index < len(props.ports)):
+            self.report({'ERROR'}, "No active port selected.")
+            return {'CANCELLED'}
+
+        vi = int(props.visible_vertices[props.active_visible_vertex_index].index)
+        port = props.ports[props.active_port_index]
+        port.attach_vertex_index = vi
+        props.last_status = f"{port.name}: Vertex Index set to {vi}"
+
+        if props.pick_auto_apply:
+            def _apply_later():
+                try:
+                    apply_scene_from_props(bpy.context, safe=True)
+                except Exception as e:
+                    bpy.context.scene.mbm_tools.last_status = f"Auto-apply FAILED: {e!r}"
+                return None
+            bpy.app.timers.register(_apply_later, first_interval=0.01)
+
+        return {'FINISHED'}
+
+
+class MBM_OT_UseVisibleFaceForActiveLabel(Operator):
+    bl_idname = "mbm.use_visible_face_for_label"
+    bl_label = "Use Selected Visible Face"
+    bl_description = "Set the active label's Face Index to the selected visible face"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        props = context.scene.mbm_tools
+        if len(props.visible_faces) == 0:
+            self.report({'ERROR'}, "No visible faces listed. Click Refresh Visible Indices first.")
+            return {'CANCELLED'}
+        if not (0 <= props.active_visible_face_index < len(props.visible_faces)):
+            self.report({'ERROR'}, "No visible face selected.")
+            return {'CANCELLED'}
+        if not (0 <= props.active_label_index < len(props.labels)):
+            self.report({'ERROR'}, "No active label selected.")
+            return {'CANCELLED'}
+
+        fi = int(props.visible_faces[props.active_visible_face_index].index)
+        lab = props.labels[props.active_label_index]
+        lab.attach_face_index = fi
+        props.last_status = f"{lab.name}: Face Index set to {fi}"
+
+        if props.pick_auto_apply:
+            def _apply_later():
+                try:
+                    apply_scene_from_props(bpy.context, safe=True)
+                except Exception as e:
+                    bpy.context.scene.mbm_tools.last_status = f"Auto-apply FAILED: {e!r}"
+                return None
+            bpy.app.timers.register(_apply_later, first_interval=0.01)
+
+        return {'FINISHED'}
+
+
 # -----------------------------
 # UI lists
 # -----------------------------
@@ -1533,6 +1981,29 @@ class MBM_UL_PortList(UIList):
         elif self.layout_type == 'GRID':
             layout.alignment = 'CENTER'
             layout.label(text="")
+
+
+
+class MBM_UL_VisibleVertexList(UIList):
+    bl_idname = "MBM_UL_VisibleVertexList"
+
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        if self.layout_type in {'DEFAULT', 'COMPACT'}:
+            layout.label(text=f"V{item.index}  ({item.x_px:.0f}, {item.y_px:.0f})", icon='VERTEXSEL')
+        elif self.layout_type == 'GRID':
+            layout.alignment = 'CENTER'
+            layout.label(text=str(item.index))
+
+
+class MBM_UL_VisibleFaceList(UIList):
+    bl_idname = "MBM_UL_VisibleFaceList"
+
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        if self.layout_type in {'DEFAULT', 'COMPACT'}:
+            layout.label(text=f"F{item.index}  ({item.x_px:.0f}, {item.y_px:.0f})", icon='FACESEL')
+        elif self.layout_type == 'GRID':
+            layout.alignment = 'CENTER'
+            layout.label(text=str(item.index))
 
 
 # -----------------------------
@@ -1613,6 +2084,100 @@ class MBM_PT_Boards(Panel):
         op2 = row.operator("mbm.set_board_plane_mode", text="Perp to Ray", icon="CON_ROTLIKE")
         op2.mode = "AXIS"
         op2.apply_now = True
+
+
+class MBM_PT_Styles(Panel):
+    bl_label = "Styles"
+    bl_idname = "MBM_PT_mbm_tools_styles"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Tool"
+    bl_parent_id = "MBM_PT_mbm_tools_root"
+    bl_options = set()
+
+    def draw(self, context):
+        layout = self.layout
+        props = context.scene.mbm_tools
+        st = props.styles
+
+        layout.use_property_split = True
+        layout.use_property_decorate = False
+
+        layout.prop(st, "enforce_global")
+
+        col = layout.column(align=True)
+        col.label(text="Port + Label sizes/colors are set here (not per-item).", icon="INFO")
+
+        # Power ports
+        box = layout.box()
+        box.label(text="Power Ports")
+        box.prop(st.port_power, "cyl_radius")
+        box.prop(st.port_power, "cyl_length_min")
+        box.prop(st.port_power, "cyl_length_max")
+        box.prop(st.port_power, "cyl_color")
+        box.prop(st.port_power, "cyl_alpha")
+        box.prop(st.port_power, "arrow_enabled")
+        if st.port_power.arrow_enabled:
+            box.prop(st.port_power, "arrow_length")
+            box.prop(st.port_power, "arrow_radius")
+        box.separator()
+        box.prop(st.port_power, "text_size")
+        box.prop(st.port_power, "text_extrude")
+        box.prop(st.port_power, "text_color")
+        box.prop(st.port_power, "text_alpha")
+        box.separator()
+        box.prop(st.port_power, "image_height")
+        box.prop(st.port_power, "image_alpha")
+        box.separator()
+        box.prop(st.port_power, "layout_image_above_text")
+        box.prop(st.port_power, "layout_spacing")
+        box.prop(st.port_power, "layout_padding")
+
+        # Info ports
+        box = layout.box()
+        box.label(text="Info Ports")
+        box.prop(st.port_info, "cyl_radius")
+        box.prop(st.port_info, "cyl_length_min")
+        box.prop(st.port_info, "cyl_length_max")
+        box.prop(st.port_info, "cyl_color")
+        box.prop(st.port_info, "cyl_alpha")
+        box.prop(st.port_info, "arrow_enabled")
+        if st.port_info.arrow_enabled:
+            box.prop(st.port_info, "arrow_length")
+            box.prop(st.port_info, "arrow_radius")
+        box.separator()
+        box.prop(st.port_info, "text_size")
+        box.prop(st.port_info, "text_extrude")
+        box.prop(st.port_info, "text_color")
+        box.prop(st.port_info, "text_alpha")
+        box.separator()
+        box.prop(st.port_info, "image_height")
+        box.prop(st.port_info, "image_alpha")
+        box.separator()
+        box.prop(st.port_info, "layout_image_above_text")
+        box.prop(st.port_info, "layout_spacing")
+        box.prop(st.port_info, "layout_padding")
+
+        # Labels
+        box = layout.box()
+        box.label(text="Labels")
+        box.prop(st.label, "cyl_radius")
+        box.prop(st.label, "cyl_length_min")
+        box.prop(st.label, "cyl_length_max")
+        box.prop(st.label, "cyl_color")
+        box.prop(st.label, "cyl_alpha")
+        box.separator()
+        box.prop(st.label, "text_size")
+        box.prop(st.label, "text_extrude")
+        box.prop(st.label, "text_color")
+        box.prop(st.label, "text_alpha")
+        box.separator()
+        box.prop(st.label, "image_height")
+        box.prop(st.label, "image_alpha")
+        box.separator()
+        box.prop(st.label, "layout_image_above_text")
+        box.prop(st.label, "layout_spacing")
+        box.prop(st.label, "layout_padding")
 
 
 class MBM_PT_Boundary(Panel):
@@ -1700,6 +2265,43 @@ class MBM_PT_Camera(Panel):
         row.operator("mbm.clear_camera_rotation", icon="X")
 
 
+
+class MBM_PT_Visibility(Panel):
+    bl_label = "Visible Indices"
+    bl_idname = "MBM_PT_mbm_tools_visibility"
+    bl_space_type = "VIEW_3D"
+    bl_region_type = "UI"
+    bl_category = "Tool"
+    bl_parent_id = "MBM_PT_mbm_tools_root"
+    bl_options = set()
+
+    def draw(self, context):
+        layout = self.layout
+        props = context.scene.mbm_tools
+        layout.use_property_split = False
+        layout.use_property_decorate = False
+
+        row = layout.row(align=True)
+        row.operator("mbm.refresh_visible_indices", icon="VIEW_CAMERA", text="Refresh (Camera-visible indices)")
+        if context.scene.camera is None:
+            layout.label(text="No active camera set in Scene Properties.", icon="ERROR")
+
+        boxv = layout.box()
+        boxv.label(text=f"Visible Vertices ({len(props.visible_vertices)})")
+        boxv.template_list("MBM_UL_VisibleVertexList", "", props, "visible_vertices", props, "active_visible_vertex_index", rows=6)
+        if 0 <= props.active_port_index < len(props.ports):
+            boxv.label(text=f"Active Port: {props.ports[props.active_port_index].name}", icon="DOT")
+        boxv.operator("mbm.use_visible_vertex_for_port", icon="CHECKMARK", text="Use selected vertex for active port")
+
+        boxf = layout.box()
+        boxf.label(text=f"Visible Faces ({len(props.visible_faces)})")
+        boxf.template_list("MBM_UL_VisibleFaceList", "", props, "visible_faces", props, "active_visible_face_index", rows=6)
+        if 0 <= props.active_label_index < len(props.labels):
+            boxf.label(text=f"Active Label: {props.labels[props.active_label_index].name}", icon="DOT")
+        boxf.operator("mbm.use_visible_face_for_label", icon="CHECKMARK", text="Use selected face for active label")
+
+
+
 class MBM_PT_Ports(Panel):
     bl_label = "Ports"
     bl_idname = "MBM_PT_mbm_tools_ports"
@@ -1745,37 +2347,14 @@ class MBM_PT_Ports(Panel):
             box.prop(p, "flow_direction")
 
             box = layout.box()
-            box.label(text="Cylinder")
-            box.prop(p, "cyl_radius")
-            box.prop(p, "cyl_color")
-            box.prop(p, "cyl_alpha")
-            box.prop(p, "cyl_length_mode")
-            if p.cyl_length_mode == "FIXED":
-                box.prop(p, "cyl_length")
-            box.prop(p, "cyl_length_min")
-            box.prop(p, "cyl_length_max")
+            box.label(text="Style")
+            box.label(text="Sizes/colors are controlled in the Styles panel.", icon="INFO")
 
             box = layout.box()
-            box.label(text="Arrowheads")
-            box.prop(p, "arrow_enabled")
-            if p.arrow_enabled:
-                box.prop(p, "arrow_length")
-                box.prop(p, "arrow_radius")
-
-            box = layout.box()
-            box.label(text="Text")
+            box.label(text="Content")
             box.prop(p, "text_value")
-            box.prop(p, "text_size")
-            box.prop(p, "text_extrude")
-            box.prop(p, "text_color")
-            box.prop(p, "text_alpha")
             box.prop(p, "font_path")
-
-            box = layout.box()
-            box.label(text="Image")
             box.prop(p, "image_filepath")
-            box.prop(p, "image_height")
-            box.prop(p, "image_alpha")
         else:
             layout.label(text="No ports loaded. Click Load, or Add Port.", icon="INFO")
 
@@ -1824,30 +2403,14 @@ class MBM_PT_Labels(Panel):
             box.prop(l, "direction")
 
             box = layout.box()
-            box.label(text="Cylinder")
-            box.prop(l, "cyl_radius")
-            box.prop(l, "cyl_color")
-            box.prop(l, "cyl_alpha")
-            box.prop(l, "cyl_length_mode")
-            if l.cyl_length_mode == "FIXED":
-                box.prop(l, "cyl_length")
-            box.prop(l, "cyl_length_min")
-            box.prop(l, "cyl_length_max")
+            box.label(text="Style")
+            box.label(text="Sizes/colors are controlled in the Styles panel.", icon="INFO")
 
             box = layout.box()
-            box.label(text="Text")
+            box.label(text="Content")
             box.prop(l, "text_value")
-            box.prop(l, "text_size")
-            box.prop(l, "text_extrude")
-            box.prop(l, "text_color")
-            box.prop(l, "text_alpha")
             box.prop(l, "font_path")
-
-            box = layout.box()
-            box.label(text="Image")
             box.prop(l, "image_filepath")
-            box.prop(l, "image_height")
-            box.prop(l, "image_alpha")
         else:
             layout.label(text="No labels loaded. Click Load, or Add Label.", icon="INFO")
 
@@ -1885,6 +2448,13 @@ classes = (
     MBM_CameraProps,
     MBM_LabelProps,
     MBM_PortProps,
+
+    MBM_PowerPortStyleProps,
+    MBM_InfoPortStyleProps,
+    MBM_LabelStyleProps,
+    MBM_StylesProps,
+
+    MBM_VisibleIndexItem,
     MBM_ToolsProps,
 
     MBM_OT_UseCLIPaths,
@@ -1906,13 +2476,21 @@ classes = (
     MBM_OT_SetPortAutoVertex,
     MBM_OT_PickPortVertex,
 
+    MBM_OT_RefreshVisibleIndices,
+    MBM_OT_UseVisibleVertexForActivePort,
+    MBM_OT_UseVisibleFaceForActiveLabel,
+
     MBM_UL_LabelList,
     MBM_UL_PortList,
+    MBM_UL_VisibleVertexList,
+    MBM_UL_VisibleFaceList,
 
     MBM_PT_Root,
     MBM_PT_Boards,
+    MBM_PT_Styles,
     MBM_PT_Boundary,
     MBM_PT_Camera,
+    MBM_PT_Visibility,
     MBM_PT_Ports,
     MBM_PT_Labels,
     MBM_PT_Scene,

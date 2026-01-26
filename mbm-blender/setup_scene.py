@@ -12,6 +12,7 @@
 # which improves reliability in --background renders.
 
 import argparse
+import copy
 import json
 import math
 import os
@@ -75,6 +76,76 @@ def parse_color_rgb(value: Any, default=(1.0, 1.0, 1.0)) -> Tuple[float, float, 
         return (clamp01(r), clamp01(g), clamp01(b))
 
     return default
+
+
+
+# ----------------------------
+# Styles (global look for ports/labels)
+# ----------------------------
+
+def _deep_merge_defaults(dst: Dict[str, Any], defaults: Dict[str, Any]) -> Dict[str, Any]:
+    """Recursively fill missing keys in dst using defaults (does not overwrite existing values)."""
+    for k, v in (defaults or {}).items():
+        if isinstance(v, dict):
+            cur = dst.get(k, None)
+            if not isinstance(cur, dict):
+                dst[k] = copy.deepcopy(v)
+            else:
+                _deep_merge_defaults(cur, v)
+        else:
+            if k not in dst or dst[k] is None:
+                dst[k] = v
+    return dst
+
+
+def _apply_style_to_spec(spec: Dict[str, Any], style: Dict[str, Any], enforce: bool, *, is_port: bool) -> Dict[str, Any]:
+    """Apply a style dict onto an object spec.
+
+    - If enforce=False: style acts as defaults (fills only missing).
+    - If enforce=True: style overwrites cylinder/arrow/layout/etc, but preserves object-specific
+      text.value, text.font, and image.filepath.
+    """
+    if not isinstance(style, dict) or not style:
+        return spec
+
+    out = copy.deepcopy(spec) if isinstance(spec, dict) else {}
+    if not enforce:
+        return _deep_merge_defaults(out, style)
+
+    # Enforced: override selected sections wholesale, while preserving per-object content.
+    preserve_text_value = None
+    preserve_text_font = None
+    preserve_image_filepath = None
+    if isinstance(out.get("text"), dict):
+        preserve_text_value = out["text"].get("value", None)
+        preserve_text_font = out["text"].get("font", None)
+    if isinstance(out.get("image"), dict):
+        preserve_image_filepath = out["image"].get("filepath", None)
+
+    for section in ("cylinder", "arrow", "layout", "board"):
+        if isinstance(style.get(section), dict):
+            out[section] = copy.deepcopy(style[section])
+
+    # Text: preserve value/font
+    if isinstance(style.get("text"), dict):
+        out["text"] = copy.deepcopy(style["text"])
+        if preserve_text_value is not None:
+            out["text"]["value"] = preserve_text_value
+        if preserve_text_font is not None:
+            out["text"]["font"] = preserve_text_font
+
+    # Image: preserve filepath
+    if isinstance(style.get("image"), dict):
+        out["image"] = copy.deepcopy(style["image"])
+        if preserve_image_filepath is not None:
+            out["image"]["filepath"] = preserve_image_filepath
+
+    return out
+
+
+def _get_port_kind(spec: Dict[str, Any]) -> str:
+    flow_cfg = spec.get("flow", {}) if isinstance(spec.get("flow", {}), dict) else {}
+    return str(flow_cfg.get("kind", spec.get("flow_kind", "POWER")) or "POWER").upper()
 
 
 def rad(deg: float) -> float:
@@ -1437,47 +1508,56 @@ def choose_vertex_and_length_for_port(
     mx = tip_margin_px / max(1.0, W)
     my = tip_margin_px / max(1.0, H)
 
-    best_any: Optional[PortPlacement] = None
-    best_any_score = -1e18
-    best_unused: Optional[PortPlacement] = None
-    best_unused_score = -1e18
+    def _search(require_visible_base_local: bool):
+        best_any: Optional[PortPlacement] = None
+        best_any_score = -1e18
+        best_unused: Optional[PortPlacement] = None
+        best_unused_score = -1e18
 
-    for v in mesh.vertices:
-        vi = int(v.index)
+        for v in mesh.vertices:
+            vi = int(v.index)
 
-        # Respect explicit selection when provided.
-        if forced_type == "VERTEX" and forced_idx is not None and vi != int(forced_idx):
-            continue
-
-        base_w = mw @ v.co
-        base_ndc, base_in = ndc_and_in_frame(scene, cam_obj, base_w)
-        if not base_in:
-            continue
-
-        if require_visible_base:
-            # Vertex hits are numerically sensitive; use a slightly larger epsilon.
-            if not visible_on_solid_from_camera(scene, cam_obj, solid_obj, solid_bvh, base_w, eps=2e-2):
+            # Respect explicit selection when provided.
+            if forced_type == "VERTEX" and forced_idx is not None and vi != int(forced_idx):
                 continue
 
-        base_px, _, _ = ndc_to_px(scene, base_ndc)
-        silhouette = (base_px - center_px).length
+            base_w = mw @ v.co
+            base_ndc, base_in = ndc_and_in_frame(scene, cam_obj, base_w)
+            if not base_in:
+                continue
 
-        dir_w = (base_w - center_w)
-        if dir_w.length < 1e-9:
-            continue
-        dir_w.normalize()
+            if require_visible_base_local:
+                # Vertex hits are numerically sensitive; use a slightly larger epsilon.
+                if not visible_on_solid_from_camera(scene, cam_obj, solid_obj, solid_bvh, base_w, eps=2e-2):
+                    continue
 
-        # Evaluate length either fixed or sampled, but keep the best score for this vertex.
-        local_best: Optional[PortPlacement] = None
-        local_best_score = -1e18
+            base_px, _, _ = ndc_to_px(scene, base_ndc)
+            silhouette = (base_px - center_px).length
 
-        if isinstance(length_cfg, (int, float)):
-            L = float(length_cfg)
-            tip_w = base_w + dir_w * (base_offset + L)
-            tip_ndc, _tip_in = ndc_and_in_frame(scene, cam_obj, tip_w)
-            if require_tip_in_frame:
-                if not (mx <= tip_ndc.x <= 1.0 - mx and my <= tip_ndc.y <= 1.0 - my and tip_ndc.z >= 0.0):
-                    local_best = None
+            dir_w = (base_w - center_w)
+            if dir_w.length < 1e-9:
+                continue
+            dir_w.normalize()
+
+            # Evaluate length either fixed or sampled, but keep the best score for this vertex.
+            local_best: Optional[PortPlacement] = None
+            local_best_score = -1e18
+
+            if isinstance(length_cfg, (int, float)):
+                L = float(length_cfg)
+                tip_w = base_w + dir_w * (base_offset + L)
+                tip_ndc, _tip_in = ndc_and_in_frame(scene, cam_obj, tip_w)
+                if require_tip_in_frame:
+                    if not (mx <= tip_ndc.x <= 1.0 - mx and my <= tip_ndc.y <= 1.0 - my and tip_ndc.z >= 0.0):
+                        local_best = None
+                    else:
+                        tip_px, _, _ = ndc_to_px(scene, tip_ndc)
+                        outd = outside_distance_to_bbox_px(tip_px, bbox_expanded)
+                        seglen = (tip_px - base_px).length
+                        out_term = outd if outd >= 0.0 else outd * 1.5
+                        score = out_term + silhouette_bias * silhouette + seg_bias * seglen
+                        local_best_score = score
+                        local_best = PortPlacement(vertex_index=vi, base_w=base_w, dir_w=dir_w, length=L, tip_w=tip_w)
                 else:
                     tip_px, _, _ = ndc_to_px(scene, tip_ndc)
                     outd = outside_distance_to_bbox_px(tip_px, bbox_expanded)
@@ -1487,51 +1567,56 @@ def choose_vertex_and_length_for_port(
                     local_best_score = score
                     local_best = PortPlacement(vertex_index=vi, base_w=base_w, dir_w=dir_w, length=L, tip_w=tip_w)
             else:
-                tip_px, _, _ = ndc_to_px(scene, tip_ndc)
-                outd = outside_distance_to_bbox_px(tip_px, bbox_expanded)
-                seglen = (tip_px - base_px).length
-                out_term = outd if outd >= 0.0 else outd * 1.5
-                score = out_term + silhouette_bias * silhouette + seg_bias * seglen
-                local_best_score = score
-                local_best = PortPlacement(vertex_index=vi, base_w=base_w, dir_w=dir_w, length=L, tip_w=tip_w)
+                for s in range(max(1, length_samples)):
+                    t = 0.0 if length_samples <= 1 else s / (length_samples - 1)
+                    L = L_min + t * (L_max - L_min)
+
+                    tip_w = base_w + dir_w * (base_offset + L)
+                    tip_ndc, _tip_in = ndc_and_in_frame(scene, cam_obj, tip_w)
+
+                    if require_tip_in_frame:
+                        if not (mx <= tip_ndc.x <= 1.0 - mx and my <= tip_ndc.y <= 1.0 - my and tip_ndc.z >= 0.0):
+                            continue
+
+                    tip_px, _, _ = ndc_to_px(scene, tip_ndc)
+                    outd = outside_distance_to_bbox_px(tip_px, bbox_expanded)
+                    seglen = (tip_px - base_px).length
+
+                    out_term = outd if outd >= 0.0 else outd * 1.5
+                    score = out_term + silhouette_bias * silhouette + seg_bias * seglen
+
+                    if score > local_best_score:
+                        local_best_score = score
+                        local_best = PortPlacement(vertex_index=vi, base_w=base_w, dir_w=dir_w, length=L, tip_w=tip_w)
+
+            if local_best is None:
+                continue
+
+            # Track best overall (used for fallback if all vertices are "used")
+            if local_best_score > best_any_score:
+                best_any_score = local_best_score
+                best_any = local_best
+
+            # Track best among unused vertices if requested
+            if used_set is None or vi not in used_set:
+                if local_best_score > best_unused_score:
+                    best_unused_score = local_best_score
+                    best_unused = local_best
+        return best_any, best_any_score, best_unused, best_unused_score
+
+    best_any, best_any_score, best_unused, best_unused_score = _search(require_visible_base)
+
+    # If we ran out of unused candidate vertices (causing overlaps), try a relaxed pass
+    # that skips the strict ray-test for base visibility. This keeps AUTO placement usable
+    # when the visibility test is overly strict for your current camera framing.
+    if best_unused is None and used_set is not None and forced_idx is None and require_visible_base:
+        _best_any2, _best_any_score2, best_unused2, _best_unused_score2 = _search(False)
+        if best_unused2 is not None:
+            best = best_unused2
         else:
-            for s in range(max(1, length_samples)):
-                t = 0.0 if length_samples <= 1 else s / (length_samples - 1)
-                L = L_min + t * (L_max - L_min)
-
-                tip_w = base_w + dir_w * (base_offset + L)
-                tip_ndc, _tip_in = ndc_and_in_frame(scene, cam_obj, tip_w)
-
-                if require_tip_in_frame:
-                    if not (mx <= tip_ndc.x <= 1.0 - mx and my <= tip_ndc.y <= 1.0 - my and tip_ndc.z >= 0.0):
-                        continue
-
-                tip_px, _, _ = ndc_to_px(scene, tip_ndc)
-                outd = outside_distance_to_bbox_px(tip_px, bbox_expanded)
-                seglen = (tip_px - base_px).length
-
-                out_term = outd if outd >= 0.0 else outd * 1.5
-                score = out_term + silhouette_bias * silhouette + seg_bias * seglen
-
-                if score > local_best_score:
-                    local_best_score = score
-                    local_best = PortPlacement(vertex_index=vi, base_w=base_w, dir_w=dir_w, length=L, tip_w=tip_w)
-
-        if local_best is None:
-            continue
-
-        # Track best overall (used for fallback if all vertices are "used")
-        if local_best_score > best_any_score:
-            best_any_score = local_best_score
-            best_any = local_best
-
-        # Track best among unused vertices if requested
-        if used_set is None or vi not in used_set:
-            if local_best_score > best_unused_score:
-                best_unused_score = local_best_score
-                best_unused = local_best
-
-    best = best_unused if best_unused is not None else best_any
+            best = best_any
+    else:
+        best = best_unused if best_unused is not None else best_any
 
     if best is None:
         if not mesh.vertices:
@@ -2330,6 +2415,17 @@ def build_scene_from_manifest(manifest: Dict[str, Any], project_root: str, do_re
     if board_plane_mode not in {"CAMERA", "AXIS"}:
         board_plane_mode = "CAMERA"
 
+    # Global styles for ports/labels (optional)
+    styles_cfg = manifest.get("styles", {}) if isinstance(manifest.get("styles", {}), dict) else {}
+    enforce_styles = bool(styles_cfg.get("enforce_global", False))
+
+    label_style = styles_cfg.get("label", {}) if isinstance(styles_cfg.get("label", {}), dict) else {}
+
+    port_styles = styles_cfg.get("port", {}) if isinstance(styles_cfg.get("port", {}), dict) else {}
+    port_power_style = port_styles.get("power", {}) if isinstance(port_styles.get("power", {}), dict) else {}
+    port_info_style = port_styles.get("info", {}) if isinstance(port_styles.get("info", {}), dict) else {}
+    port_both_style = port_styles.get("both", {}) if isinstance(port_styles.get("both", {}), dict) else {}
+
     # Track vertices used by AUTO-selected ports so they don't stack on the same vertex.
     used_port_vertices_by_boundary: Dict[str, set[int]] = {}
 
@@ -2338,12 +2434,25 @@ def build_scene_from_manifest(manifest: Dict[str, Any], project_root: str, do_re
             continue
         t = str(o.get("type", "")).lower()
         if t == "label":
-            build_label_object(o, boundaries, cam_obj, scene, parent_collection=root_coll, project_root=project_root, label_plane_mode=board_plane_mode)
+            spec = _apply_style_to_spec(o, label_style, enforce_styles, is_port=False)
+            build_label_object(spec, boundaries, cam_obj, scene, parent_collection=root_coll, project_root=project_root, label_plane_mode=board_plane_mode)
         elif t == "port":
-            target_name = str(o.get("target", "boundary"))
+            kind = _get_port_kind(o)
+            if kind == "INFO":
+                st = port_info_style
+            elif kind == "POWER":
+                st = port_power_style
+            elif kind in {"BOTH", "POWER+INFO", "POWER_INFO"}:
+                st = (port_both_style or port_power_style)
+            else:
+                st = port_power_style
+
+            spec = _apply_style_to_spec(o, st, enforce_styles, is_port=True)
+
+            target_name = str(spec.get("target", "boundary"))
             used_set = used_port_vertices_by_boundary.setdefault(target_name, set())
             build_port_object(
-                o,
+                spec,
                 boundaries,
                 cam_obj,
                 scene,
