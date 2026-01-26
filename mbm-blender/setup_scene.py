@@ -188,6 +188,7 @@ def clear_scene_data():
     # This prevents errors like: ReferenceError('StructRNA of type Mesh has been removed')
     try:
         _mesh_cache.clear()
+        _mesh_mat_cache.clear()
     except Exception:
         pass
     # Remove objects
@@ -377,11 +378,61 @@ def make_image_material(name: str, image: bpy.types.Image, alpha: float = 1.0) -
 
 
 def assign_material(obj: bpy.types.Object, mat: bpy.types.Material):
-    if obj.data is None:
+    """Assign a material to an object *safely* even when the object shares a cached mesh.
+
+    Blender stores materials on the *mesh datablock* (obj.data), not per-object.
+    In this project we intentionally reuse cached primitive meshes (unit cylinder/plane/cone)
+    across many objects for speed.
+
+    If we directly clear/append obj.data.materials on a shared mesh, every other object that
+    uses that same mesh will suddenly change appearance (classic 'last material wins' bug).
+
+    Fix: keep a small cache of (base_mesh_name, material_name) -> mesh_copy_with_that_material,
+    and swap obj.data to the appropriate copy.
+    """
+    if obj is None or obj.data is None:
         return
-    if hasattr(obj.data, "materials"):
-        obj.data.materials.clear()
-        obj.data.materials.append(mat)
+    data = obj.data
+    if not hasattr(data, "materials"):
+        return
+
+    # If already correct, do nothing.
+    try:
+        mats = data.materials
+        if len(mats) == 1 and mats[0] == mat:
+            return
+    except Exception:
+        pass
+
+    # Choose a stable key based on the current mesh name and material name.
+    base_name = getattr(data, "name", "Mesh")
+    mat_name = getattr(mat, "name", "Mat")
+    key = f"{base_name}__MAT__{mat_name}"
+
+    # Reuse an existing mesh copy if we already made one for this (mesh, material) pair.
+    m = _mesh_mat_cache.get(key)
+    if m is not None and m.name in bpy.data.meshes:
+        obj.data = m
+        return
+
+    # Otherwise make a copy of the mesh datablock and assign the material there.
+    try:
+        m = data.copy()
+    except Exception:
+        # As a last resort, mutate in place (may affect shared meshes)
+        data.materials.clear()
+        data.materials.append(mat)
+        return
+
+    m.name = key[:63]  # Blender datablock names are limited; keep it short/stable.
+    try:
+        m.materials.clear()
+        m.materials.append(mat)
+    except Exception:
+        pass
+
+    _mesh_mat_cache[key] = m
+    obj.data = m
 
 
 # ----------------------------
@@ -389,6 +440,9 @@ def assign_material(obj: bpy.types.Object, mat: bpy.types.Material):
 # ----------------------------
 
 _mesh_cache: Dict[str, bpy.types.Mesh] = {}
+# Cache of mesh copies with a specific material applied (prevents shared-mesh material cross-talk)
+_mesh_mat_cache: Dict[str, bpy.types.Mesh] = {}
+
 
 
 def unit_plane_mesh() -> bpy.types.Mesh:
