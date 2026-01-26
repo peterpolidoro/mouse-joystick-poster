@@ -1,8 +1,13 @@
 """
 render_glb.py
 
-Import a GLB, normalize it, set up a simple studio scene (camera + lights),
-and optionally render a high-quality PNG with a transparent background.
+Import a GLB, set up a simple studio scene (camera + lights),
+frame it automatically based on its real size, and optionally render a high-quality PNG
+with a transparent background.
+
+By default **the GLB is not rescaled** (you get the model in its original units).
+If you want consistent sizing across many assets, pass --normalize to scale so that
+the model's max dimension becomes --size.
 
 Designed for two workflows:
 
@@ -53,8 +58,11 @@ def parse_args():
 
     # Transform overrides
     p.add_argument("--rot", nargs=3, type=float, default=[0.0, 0.0, 0.0])  # degrees
-    p.add_argument("--scale", type=float, default=1.0)  # extra multiplier after normalization
-    p.add_argument("--size", type=float, default=2.0)   # target max dimension (Blender units)
+    p.add_argument("--scale", type=float, default=1.0)  # uniform scale multiplier (default 1.0)
+    p.add_argument("--normalize", dest="normalize", action="store_true", help="Normalize imported model so its max dimension == --size (useful for consistent asset renders).")
+    p.add_argument("--no-normalize", dest="normalize", action="store_false", help="Do not normalize; keep GLB scale (default).")
+    p.add_argument("--size", type=float, default=2.0)   # target max dimension if --normalize is set (Blender units)
+    p.set_defaults(normalize=False)
 
     # Render settings
     p.add_argument("--res", nargs=2, type=int, default=[1024, 1024])
@@ -106,7 +114,9 @@ def _cli_provided(cli_flags: set, key: str) -> bool:
     """
     snake = f"--{key}"
     kebab = f"--{key.replace('_', '-')}"
-    return (snake in cli_flags) or (kebab in cli_flags)
+    no_snake = f"--no-{key}"
+    no_kebab = f"--no-{key.replace('_', '-')}"
+    return (snake in cli_flags) or (kebab in cli_flags) or (no_snake in cli_flags) or (no_kebab in cli_flags)
 
 
 def apply_manifest_overrides(args, cli_flags: set):
@@ -551,14 +561,20 @@ def setup_scene(args):
     root.rotation_euler = (rx, ry, rz)
     bpy.context.view_layer.update()
 
-    # Normalize scale (so max dimension == args.size), then apply extra user scale
+    # Compute bounds (after rotation) and apply scaling.
+    # By default we keep the GLB's original scale and only apply --scale.
+    # If --normalize is set, we scale so that max dimension == --size (then apply --scale).
     min_v, max_v = get_bounds_world(meshes)
     dims = (max_v - min_v)
     max_dim = max(dims.x, dims.y, dims.z)
     if max_dim <= 1e-8:
         raise RuntimeError("Imported model bounds are too small/invalid.")
 
-    scale_factor = (float(args.size) / float(max_dim)) * float(args.scale)
+    if getattr(args, "normalize", False):
+        scale_factor = (float(args.size) / float(max_dim)) * float(args.scale)
+    else:
+        scale_factor = float(args.scale)
+
     root.scale = Vector((scale_factor, scale_factor, scale_factor))
     bpy.context.view_layer.update()
 
@@ -576,16 +592,27 @@ def setup_scene(args):
     dims = (max_v - min_v)
     target = Vector((0.0, 0.0, dims.z * 0.5))
 
+    # Model size (used to scale the light rig + optional ground plane)
+    rig = max(max(dims.x, dims.y, dims.z), 1e-6)
+
     # Optional shadow catcher plane
     if scene.render.engine == "CYCLES" and getattr(args, "shadow_catcher", False):
-        add_shadow_catcher_plane(plane_size=max(6.0, float(args.size) * 3.0))
+        # Make the plane very large so its edge never shows up in frame.
+        # (If you want *no* floor at all, disable shadow_catcher in the manifest/CLI.)
+        plane_size = max(10.0, rig * 50.0)
+        add_shadow_catcher_plane(plane_size=plane_size)
 
-    # Lights (simple 3-point studio)
-    # Because we normalized to args.size, these positions/energies are reasonably consistent.
-    radius = float(args.size) * 1.6
-    add_area_light("Key",  ( radius, -radius, float(args.size) * 1.6), target, size=float(args.size) * 1.2, energy=1500)
-    add_area_light("Fill", (-radius, -radius, float(args.size) * 1.0), target, size=float(args.size) * 1.5, energy=500)
-    add_area_light("Rim",  ( 0.0,     radius, float(args.size) * 1.8), target, size=float(args.size) * 1.0, energy=900)
+    # Lights (simple 3-point studio), scaled to model size
+    radius = rig * 1.6
+
+    # Energies were tuned for a ~2-unit model (the old normalized default). Scale with size so exposure stays similar.
+    ref = 2.0
+    energy_mult = (rig / ref) ** 2
+    energy_mult = max(1e-4, min(float(energy_mult), 1e6))
+
+    add_area_light("Key",  ( radius, -radius, rig * 1.6), target, size=rig * 1.2, energy=1500 * energy_mult)
+    add_area_light("Fill", (-radius, -radius, rig * 1.0), target, size=rig * 1.5, energy= 500 * energy_mult)
+    add_area_light("Rim",  ( 0.0,     radius, rig * 1.8), target, size=rig * 1.0, energy= 900 * energy_mult)
 
     # Camera distance to frame object
     cam = add_camera(target=target, distance=1.0, azimuth_deg=args.azimuth, elevation_deg=args.elevation, fov_deg=args.fov)
