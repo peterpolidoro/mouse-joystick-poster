@@ -399,9 +399,10 @@ def make_image_material(name: str, image: bpy.types.Image, alpha: float = 1.0) -
     tex.location = (0, 0)
     tex.image = image
 
-    principled = nodes.new("ShaderNodeBsdfPrincipled")
-    principled.location = (250, -120)
-    principled.inputs["Roughness"].default_value = 0.5
+    # Use Emission for documentation renders: lighting-independent and predictable.
+    emission = nodes.new("ShaderNodeEmission")
+    emission.location = (250, -120)
+    emission.inputs["Strength"].default_value = 1.0
 
     transparent = nodes.new("ShaderNodeBsdfTransparent")
     transparent.location = (250, 120)
@@ -415,7 +416,17 @@ def make_image_material(name: str, image: bpy.types.Image, alpha: float = 1.0) -
     mix = nodes.new("ShaderNodeMixShader")
     mix.location = (500, 0)
 
-    links.new(tex.outputs["Color"], principled.inputs["Base Color"])
+    # Texture sampling preferences
+    try:
+        tex.extension = "CLIP"
+    except Exception:
+        pass
+    try:
+        tex.interpolation = "Linear"
+    except Exception:
+        pass
+
+    links.new(tex.outputs["Color"], emission.inputs["Color"])
     if "Alpha" in tex.outputs:
         links.new(tex.outputs["Alpha"], mul.inputs[0])
         links.new(mul.outputs[0], mix.inputs["Fac"])
@@ -426,13 +437,21 @@ def make_image_material(name: str, image: bpy.types.Image, alpha: float = 1.0) -
         links.new(v.outputs[0], mix.inputs["Fac"])
 
     links.new(transparent.outputs[0], mix.inputs[1])
-    links.new(principled.outputs[0], mix.inputs[2])
+    links.new(emission.outputs[0], mix.inputs[2])
     links.new(mix.outputs[0], out.inputs["Surface"])
 
     if hasattr(mat, "blend_method"):
-        mat.blend_method = "BLEND" if alpha < 1.0 else "OPAQUE"
+        # Always use a transparency-capable mode; the shader includes transparency even
+        # when alpha==1.0, and Eevee will otherwise render a white quad in many cases.
+        mat.blend_method = "BLEND"
     if hasattr(mat, "shadow_method"):
         mat.shadow_method = "NONE"
+
+    # Improves icon look in documentation renders
+    try:
+        mat.use_backface_culling = True
+    except Exception:
+        pass
 
     return mat
 
@@ -511,11 +530,28 @@ def unit_plane_mesh() -> bpy.types.Mesh:
         return _mesh_cache[key]
 
     # 1x1 plane centered at origin in XY, normal +Z
+    # IMPORTANT: provide an explicit UV map. Without UVs, Blender's Image Texture
+    # node can evaluate to a constant color in renders (common symptom: a white
+    # rectangle instead of the image).
     verts = [(-0.5, -0.5, 0.0), (0.5, -0.5, 0.0), (0.5, 0.5, 0.0), (-0.5, 0.5, 0.0)]
     faces = [(0, 1, 2, 3)]
     m = bpy.data.meshes.new("UnitPlane")
     m.from_pydata(verts, [], faces)
     m.update()
+
+    # Add UVs: (0,0) bottom-left ... (1,1) top-right
+    try:
+        uv = m.uv_layers.new(name="UVMap")
+        # One polygon with 4 loops
+        if len(m.polygons) == 1:
+            poly = m.polygons[0]
+            loop_indices = range(poly.loop_start, poly.loop_start + poly.loop_total)
+            # The loop->vertex order matches faces[0]
+            uvs = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]
+            for li, uvco in zip(loop_indices, uvs):
+                uv.data[li].uv = uvco
+    except Exception:
+        pass
     _mesh_cache[key] = m
     return m
 
@@ -2210,20 +2246,8 @@ def build_label_object(
         elements.append(("text", text_obj, text_w, text_h))
 
     if not elements:
-        fallback_text_cfg = dict(text_cfg)
-        fallback_text_cfg["value"] = name
-        fallback_text_cfg.setdefault("size", 0.25)
-        fallback_text_cfg.setdefault("color", "#FFFFFF")
-        fallback_text_cfg.setdefault("alpha", 1.0)
-        text_obj = create_text_object(f"{name}_Text", fallback_text_cfg, coll, mat_text)
-        parent_keep_world(text_obj, board_root)
-        try:
-            bpy.context.view_layer.update()
-        except Exception:
-            pass
-        text_w = float(text_obj.dimensions.x)
-        text_h = float(text_obj.dimensions.y)
-        elements = [("text", text_obj, text_w, text_h)]
+        # No text/image content requested/available: do not create fallback text.
+        return
 
     if len(elements) == 1:
         _, obj, _, _ = elements[0]
@@ -2470,20 +2494,8 @@ def build_port_object(
         elements.append(("text", text_obj, text_w, text_h))
 
     if not elements:
-        fallback_text_cfg = dict(text_cfg)
-        fallback_text_cfg["value"] = name
-        fallback_text_cfg.setdefault("size", 0.25)
-        fallback_text_cfg.setdefault("color", "#FFFFFF")
-        fallback_text_cfg.setdefault("alpha", 1.0)
-        text_obj = create_text_object(f"{name}_Text", fallback_text_cfg, coll, mat_text)
-        parent_keep_world(text_obj, board_root)
-        try:
-            bpy.context.view_layer.update()
-        except Exception:
-            pass
-        text_w = float(text_obj.dimensions.x)
-        text_h = float(text_obj.dimensions.y)
-        elements = [("text", text_obj, text_w, text_h)]
+        # No text/image content requested/available: do not create fallback text.
+        return
 
     if len(elements) == 1:
         _, obj, _, _ = elements[0]

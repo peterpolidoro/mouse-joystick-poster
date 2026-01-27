@@ -18,7 +18,7 @@
 bl_info = {
     "name": "MBM Tools (Boundary/Ports/Labels)",
     "author": "ChatGPT",
-    "version": (0, 6, 0),
+    "version": (0, 7, 1),
     "blender": (3, 6, 0),
     "location": "View3D > Sidebar > Tool ; Properties > Scene",
     "description": "Edit MBM manifest (boundary + ports + labels) in Blender, apply and save for reproducible renders.",
@@ -326,7 +326,7 @@ class MBM_LabelProps(PropertyGroup):
     cyl_color: FloatVectorProperty(name="Color", subtype="COLOR", size=3, default=(1.0, 1.0, 1.0), min=0.0, max=1.0, update=_on_prop_update)
     cyl_alpha: FloatProperty(name="Alpha", default=1.0, min=0.0, max=1.0, update=_on_prop_update)
 
-    text_value: StringProperty(name="Text", default="Label", update=_on_prop_update)
+    text_value: StringProperty(name="Text", default="", update=_on_prop_update)
     text_offset_y: FloatProperty(name="Text Offset Y", default=0.0, soft_min=-1.0, soft_max=1.0, description="Move text up/down in its board plane (local Y).", update=_on_prop_update)
     text_size: FloatProperty(name="Size", default=0.30, min=0.01, soft_max=2.0, update=_on_prop_update)
     text_extrude: FloatProperty(name="Extrude", default=0.02, min=0.0, soft_max=0.2, description="Text thickness (curve extrude).", update=_on_prop_update)
@@ -373,7 +373,7 @@ class MBM_PortProps(PropertyGroup):
     arrow_length: FloatProperty(name="Arrow Length", default=0.18, min=0.001, soft_max=2.0, update=_on_prop_update)
     arrow_radius: FloatProperty(name="Arrow Radius", default=0.07, min=0.001, soft_max=2.0, update=_on_prop_update)
 
-    text_value: StringProperty(name="Text", default="Port", update=_on_prop_update)
+    text_value: StringProperty(name="Text", default="", update=_on_prop_update)
     text_offset_y: FloatProperty(name="Text Offset Y", default=0.0, soft_min=-1.0, soft_max=1.0, description="Move text up/down in its board plane (local Y).", update=_on_prop_update)
     text_size: FloatProperty(name="Size", default=0.30, min=0.01, soft_max=2.0, update=_on_prop_update)
     text_extrude: FloatProperty(name="Extrude", default=0.02, min=0.0, soft_max=0.2, description="Text thickness (curve extrude).", update=_on_prop_update)
@@ -766,7 +766,7 @@ def load_manifest_into_props(manifest: dict, props: MBM_ToolsProps):
             item.cyl_alpha = float(cyl.get("alpha", item.cyl_alpha))
 
             txt = l.get("text", {}) if isinstance(l.get("text", {}), dict) else {}
-            item.text_value = str(txt.get("value", item.text_value))
+            item.text_value = str(txt.get("value", "") or "")
             item.text_size = float(txt.get("size", item.text_size))
             item.text_color = _parse_color_rgb(txt.get("color"), item.text_color)
             item.text_alpha = float(txt.get("alpha", item.text_alpha))
@@ -828,7 +828,7 @@ def load_manifest_into_props(manifest: dict, props: MBM_ToolsProps):
             item.arrow_radius = float(arrow.get("radius", item.arrow_radius))
 
             txt = p.get("text", {}) if isinstance(p.get("text", {}), dict) else {}
-            item.text_value = str(txt.get("value", item.text_value))
+            item.text_value = str(txt.get("value", "") or "")
             item.text_size = float(txt.get("size", item.text_size))
             item.text_color = _parse_color_rgb(txt.get("color"), item.text_color)
             item.text_alpha = float(txt.get("alpha", item.text_alpha))
@@ -1078,15 +1078,24 @@ def update_manifest_from_props(manifest: dict, props: MBM_ToolsProps) -> dict:
         l.pop("cylinder", None)
         l.pop("layout", None)
 
-        txt = l.setdefault("text", {})
-        if not isinstance(txt, dict):
-            l["text"] = {}
-            txt = l["text"]
-        # Keep only value/font here; sizes/colors come from styles.label.text
-        txt.clear()
-        txt["value"] = str(item.text_value)
-        txt["font"] = item.font_path if item.font_path.strip() else None
-        txt["offset_y"] = float(item.text_offset_y)
+        # Text is optional: if text_value is blank and there is no font/offset, omit the text block.
+        tv = (item.text_value or "").strip()
+        fp = item.font_path.strip()
+        offy = float(item.text_offset_y)
+        if (not tv) and (not fp) and abs(offy) < 1.0e-9:
+            l.pop("text", None)
+        else:
+            txt = l.setdefault("text", {})
+            if not isinstance(txt, dict):
+                l["text"] = {}
+                txt = l["text"]
+            txt.clear()
+            if tv:
+                txt["value"] = tv
+            if fp:
+                txt["font"] = fp
+            if abs(offy) >= 1.0e-9:
+                txt["offset_y"] = offy
 
         img = l.setdefault("image", {})
         if not isinstance(img, dict):
@@ -1125,15 +1134,24 @@ def update_manifest_from_props(manifest: dict, props: MBM_ToolsProps) -> dict:
         p.pop("arrow", None)
         p.pop("layout", None)
 
-        txt = p.setdefault("text", {})
-        if not isinstance(txt, dict):
-            p["text"] = {}
-            txt = p["text"]
-        # Keep only value/font here; sizes/colors come from styles.port.*.text
-        txt.clear()
-        txt["value"] = str(item.text_value)
-        txt["font"] = item.font_path if item.font_path.strip() else None
-        txt["offset_y"] = float(item.text_offset_y)
+        # Text is optional: if text_value is blank and there is no font/offset, omit the text block.
+        tv = (item.text_value or "").strip()
+        fp = item.font_path.strip()
+        offy = float(item.text_offset_y)
+        if (not tv) and (not fp) and abs(offy) < 1.0e-9:
+            p.pop("text", None)
+        else:
+            txt = p.setdefault("text", {})
+            if not isinstance(txt, dict):
+                p["text"] = {}
+                txt = p["text"]
+            txt.clear()
+            if tv:
+                txt["value"] = tv
+            if fp:
+                txt["font"] = fp
+            if abs(offy) >= 1.0e-9:
+                txt["offset_y"] = offy
 
         img = p.setdefault("image", {})
         if not isinstance(img, dict):
